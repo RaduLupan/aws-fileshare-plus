@@ -23,7 +23,7 @@ module "network" {
   environment        = var.environment
   aws_region         = var.aws_region
   vpc_cidr           = "10.0.0.0/16"                # Or use a variable if you want this to be configurable per env
-  availability_zones = ["us-east-1a", "us-east-1b"] # Ensure this matches your region
+  availability_zones = var.availability_zones # Use the availability zones defined in variables.tf
   # public_subnet_cidrs and private_subnet_cidrs can be left empty to use defaults
   enable_nat_gateway = true
   single_nat_gateway = true
@@ -38,8 +38,8 @@ module "frontend_app" {
 
   # Pass variables to the module
   environment            = var.environment
-  bucket_name_prefix     = "my-file-share-dev" # Unique prefix for this environment
-  cloudfront_comment     = "Dev CloudFront distribution for My File Share"
+  bucket_name_prefix     = var.project_name
+  cloudfront_comment     = "Dev CloudFront distribution for Radu's File Share App"
   viewer_protocol_policy = "allow-all" # For dev testing, change to "redirect-to-https" for production env
 
   # If you decide to use a custom domain later for dev:
