@@ -40,10 +40,10 @@ module "frontend_app" {
   environment            = var.environment
   bucket_name_prefix     = var.project_name
   cloudfront_comment     = "Dev CloudFront distribution for Radu's File Share App"
-  viewer_protocol_policy = "allow-all" # For dev testing, change to "redirect-to-https" for production env
+  viewer_protocol_policy = "redirect-to-https" # For dev testing, change to "redirect-to-https" for production env
 
   # If you decide to use a custom domain later for dev:
-  # custom_domain_name   = "dev.example.com"
+  custom_domain_name   = "dev.example.com"
   # acm_certificate_arn  = "arn:aws:acm:us-east-1:123456789012:certificate/abc-123"
 }
 
