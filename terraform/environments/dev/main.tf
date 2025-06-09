@@ -22,7 +22,7 @@ module "network" {
   project_name       = var.project_name
   environment        = var.environment
   aws_region         = var.aws_region
-  vpc_cidr           = "10.0.0.0/16"                # Or use a variable if you want this to be configurable per env
+  vpc_cidr           = "10.0.0.0/16"          # Or use a variable if you want this to be configurable per env
   availability_zones = var.availability_zones # Use the availability zones defined in variables.tf
   # public_subnet_cidrs and private_subnet_cidrs can be left empty to use defaults
   enable_nat_gateway = true
@@ -40,11 +40,11 @@ module "frontend_app" {
   environment            = var.environment
   bucket_name_prefix     = var.project_name
   cloudfront_comment     = "Dev CloudFront distribution for Radu's File Share App"
-  viewer_protocol_policy = "redirect-to-https" # For dev testing, change to "redirect-to-https" for production env
+  viewer_protocol_policy = var.cloudfront_viewer_protocol_policy # For dev testing, change to "redirect-to-https" for production env
 
   # If you decide to use a custom domain later for dev:
-  custom_domain_name   = "dev.example.com"
-  # acm_certificate_arn  = "arn:aws:acm:us-east-1:123456789012:certificate/abc-123"
+  custom_domain_name  = var.cloudfront_custom_domain_name
+  acm_certificate_arn = var.cloudfront_https_certificate_arn
 }
 
 # Call the backend module
@@ -54,21 +54,28 @@ module "backend_app" {
   project_name                   = var.project_name
   environment                    = var.environment
   aws_region                     = var.aws_region # Pass the region to backend module
+  
   vpc_id                         = module.network.vpc_id
   public_subnet_ids              = module.network.public_subnet_ids
   private_subnet_ids             = module.network.private_subnet_ids
   alb_security_group_id          = module.network.alb_security_group_id
+  
   ecs_tasks_security_group_id    = module.network.ecs_tasks_security_group_id
   container_port                 = 5000
+  
   cpu                            = 256
   memory                         = 512
-  desired_count                  = 0 # Explicitly set to 0 for dev environment's initial deploy
+  desired_count                  = 0     # Explicitly set to 0 for dev environment's initial deploy
+  
   enable_alb_deletion_protection = false # Set to true for production environments
   alb_health_check_path          = "/"
-  alb_listener_http_port         = 80
-  enable_https_listener          = false # Set to true to enable HTTPS, and provide alb_https_certificate_arn
-  alb_listener_https_port        = 443
-  # alb_https_certificate_arn   = "arn:aws:acm:us-east-2:123456789012:certificate/abc-123" # Uncomment and provide if enable_https_listener is true
+
+  alb_listener_http_port  = 80
+  alb_listener_https_port = 443
+
+  enable_https_listener         = var.alb_enable_https_listener # Set to true to enable HTTPS, and provide alb_https_certificate_arn
+  alb_https_certificate_arn     = var.alb_https_certificate_arn # Uncomment and provide if enable_https_listener is true
+  
   s3_uploads_bucket_name_prefix = "${var.project_name}-${var.environment}-uploads"
   log_retention_in_days         = 30
 }
