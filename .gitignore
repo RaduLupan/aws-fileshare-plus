@@ -24,3 +24,6 @@ override.tf.json
 terraform.rc
 
 .terraform*
+
+# node_modules directories
+node_modules/ 
