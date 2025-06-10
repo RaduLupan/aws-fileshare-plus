@@ -27,3 +27,6 @@ terraform.rc
 
 # node_modules directories
 node_modules/ 
+
+# build directories
+build/
