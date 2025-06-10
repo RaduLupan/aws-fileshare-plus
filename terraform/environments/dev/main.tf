@@ -48,8 +48,8 @@ module "frontend_app" {
 
   # Pass backend ALB details for CloudFront proxying
   backend_alb_dns_name = module.backend_app.alb_dns_name # This is the raw ALB DNS name, NOT its custom domain
-  alb_http_port        = module.network.alb_http_port
-  alb_https_port       = module.network.alb_https_port
+  alb_http_port        = var.alb_http_port_for_frontend # From a new variable in dev/variables.tf
+  alb_https_port       = var.alb_https_port_for_frontend # From a new variable in dev/variables.tf
 }
 
 # Call the backend module

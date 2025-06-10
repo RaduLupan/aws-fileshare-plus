@@ -59,3 +59,21 @@ variable "cloudfront_viewer_protocol_policy" {
   type        = string
   default     = "redirect-to-https" # Change to "https-only" for production
 }
+
+variable "alb_http_port_for_frontend" {
+  description = "The HTTP port of the ALB, passed to frontend module for CloudFront origin configuration."
+  type        = number
+  default     = 80
+}
+
+variable "alb_https_port_for_frontend" {
+  description = "The HTTPS port of the ALB, passed to frontend module for CloudFront origin configuration."
+  type        = number
+  default     = 443
+}
+
+# Note: The network module's alb_http_port and alb_https_port variables
+# are conceptually defining what the *network* provides.
+# The frontend module's alb_http_port and alb_https_port variables are
+# defining what the *frontend CloudFront distribution* needs to know
+# to talk to the backend. They happen to be the same values.
