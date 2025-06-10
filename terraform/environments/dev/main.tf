@@ -39,12 +39,17 @@ module "frontend_app" {
   # Pass variables to the module
   environment            = var.environment
   bucket_name_prefix     = var.project_name
-  cloudfront_comment     = "Dev CloudFront distribution for Radu's File Share App"
+  cloudfront_comment     = "${var.environment} CloudFront distribution for ${var.project_name} frontend"
   viewer_protocol_policy = var.cloudfront_viewer_protocol_policy # For dev testing, change to "redirect-to-https" for production env
 
   # If you decide to use a custom domain later for dev:
   custom_domain_name  = var.cloudfront_custom_domain_name
   acm_certificate_arn = var.cloudfront_https_certificate_arn
+
+  # Pass backend ALB details for CloudFront proxying
+  backend_alb_dns_name = module.backend_app.alb_dns_name # This is the raw ALB DNS name, NOT its custom domain
+  alb_http_port        = module.network.alb_http_port
+  alb_https_port       = module.network.alb_https_port
 }
 
 # Call the backend module
