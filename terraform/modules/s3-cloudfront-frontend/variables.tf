@@ -48,3 +48,21 @@ variable "acm_certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "backend_alb_dns_name" {
+  description = "The DNS name of the backend ALB, if proxying API calls through CloudFront."
+  type        = string
+  default     = null
+}
+
+variable "alb_http_port" {
+  description = "The HTTP port of the ALB (for CloudFront custom origin config)."
+  type        = number
+  default     = 80
+}
+
+variable "alb_https_port" {
+  description = "The HTTPS port of the ALB (for CloudFront custom origin config)."
+  type        = number
+  default     = 443
+}
