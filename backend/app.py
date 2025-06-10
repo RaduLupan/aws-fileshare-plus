@@ -6,7 +6,6 @@ from botocore.exceptions import BotoCoreError, NoCredentialsError, PartialCreden
 from flask_cors import CORS
 
 # Load environment variables
-# S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'my-wetransfer-clone-file-uploads-2c4b3d736300') # REMOVE THIS LINE
 S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME') # Keep this line, it will now get the name from ECS
 
 # Initialize the Flask application
@@ -43,7 +42,7 @@ s3_client = boto3.client('s3')
 def index():
     # Prepare a simple welcome message
     welcome_message = {
-        'message': 'Welcome to We Transfer Clone API',
+        'message': 'Welcome to FileShare Plus API',
         'description': 'This API allows you to upload files to S3.',
     }
     return jsonify(welcome_message), 200
