@@ -6,7 +6,13 @@ const UploadForm = () => {
   const [loading, setLoading] = useState(false);
   const [responseMessage, setResponseMessage] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
-  const BACKEND_API_URL = process.env.REACT_APP_BACKEND_API_URL; // Declare and use it
+
+  // This will now hold your CloudFront domain (e.g., "https://cf.aws.lupan.ca")
+  // and will be set during the `npm run build` process via REACT_APP_BACKEND_API_URL
+  const BACKEND_BASE_URL = process.env.REACT_APP_BACKEND_API_URL;
+
+  // Optional: For debugging, you can log this value
+  // console.log("Frontend is configured to use API base URL:", BACKEND_BASE_URL);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -26,8 +32,9 @@ const UploadForm = () => {
       setResponseMessage('');
       setDownloadUrl('');
 
-      // Replace this URL with your backend API endpoint
-      const response = await fetch(`${BACKEND_API_URL}/upload`, {
+      // Construct the API URL by appending the /api/ prefix and the specific endpoint
+      const uploadUrl = `${BACKEND_BASE_URL}/api/upload`;
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
@@ -38,20 +45,28 @@ const UploadForm = () => {
         setResponseMessage('File uploaded successfully!');
 
         // Fetch the download link using the returned file name
-        // THIS IS THE LINE TO FIX for the download link fetch
-        const linkResponse = await fetch(`${BACKEND_API_URL}/get-download-link?file_name=${result.file_name}`); // <--- CORRECTED LINE
+        const downloadLinkUrl = `${BACKEND_BASE_URL}/api/get-download-link?file_name=${result.file_name}`;
+        const linkResponse = await fetch(downloadLinkUrl); // <--- CORRECTED LINE (again, just ensuring the prefix)
+
         if (linkResponse.ok) {
           const linkResult = await linkResponse.json();
           setDownloadUrl(linkResult.download_url);
         } else {
-          setResponseMessage('Failed to generate download link.');
+          // It's good practice to log the full error response for debugging
+          const errorText = await linkResponse.text();
+          console.error('Failed to generate download link. Response Status:', linkResponse.status, 'Response Body:', errorText);
+          setResponseMessage(`Failed to generate download link. Status: ${linkResponse.status}`);
         }
       } else {
-        setResponseMessage('File upload failed.');
+        // Log the full error response for debugging
+        const errorText = await response.text();
+        console.error('File upload failed. Response Status:', response.status, 'Response Body:', errorText);
+        setResponseMessage(`File upload failed. Status: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
-      setResponseMessage('An error occurred during file upload.');
+      // Catch network errors, CORS preflight errors, etc.
+      console.error('An error occurred during file operation:', error);
+      setResponseMessage('An error occurred during file operation.');
     } finally {
       setLoading(false);
     }
