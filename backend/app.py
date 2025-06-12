@@ -47,7 +47,7 @@ def index():
     }
     return jsonify(welcome_message), 200
 
-@app.route('/upload', methods=['POST'])
+@app.route('/api/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -82,7 +82,7 @@ def generate_presigned_url(file_name, expiration=3600):
 
     return response
 
-@app.route('/get-download-link', methods=['GET'])
+@app.route('/api/get-download-link', methods=['GET'])
 def get_download_link():
     file_name = request.args.get('file_name')
     logger.info(f"Received request for download link for file: {file_name}") # New log
