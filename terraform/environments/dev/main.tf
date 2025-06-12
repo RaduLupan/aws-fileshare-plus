@@ -47,7 +47,7 @@ module "frontend_app" {
   acm_certificate_arn = var.cloudfront_https_certificate_arn
 
   # Pass backend ALB details for CloudFront proxying
-  backend_alb_dns_name = module.backend_app.alb_dns_name # This is the raw ALB DNS name, NOT its custom domain
+  backend_alb_dns_name = module.backend_app.alb_dns_name # the raw ALB DNS name. var.alb_custom_domain_name also works if you want to use a custom domain for the ALB  
   alb_http_port        = var.alb_http_port_for_frontend # From a new variable in dev/variables.tf
   alb_https_port       = var.alb_https_port_for_frontend # From a new variable in dev/variables.tf
 }
