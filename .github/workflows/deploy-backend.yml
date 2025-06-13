@@ -1,0 +1,61 @@
+# .github/workflows/deploy-backend.yml
+
+name: Manually Deploy Backend
+
+on:
+  # This makes the workflow manually triggerable from the Actions tab
+  workflow_dispatch:
+    inputs:
+      # This creates a dropdown menu to select the branch
+      branch:
+        description: 'Branch to deploy from'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - main
+
+jobs:
+  deploy:
+    name: Build and Deploy Backend
+    runs-on: ubuntu-latest
+
+    # This logic now reads from the manual dropdown input
+    env:
+      TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
+
+    steps:
+      # We check out the specific branch you selected
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Update ECS Service
+        env:
+          ECS_CLUSTER: ${{ env.TARGET_ENV == 'prod' && env.ECS_CLUSTER_NAME_PROD || env.ECS_CLUSTER_NAME_DEV }}
+          ECS_SERVICE: ${{ env.TARGET_ENV == 'prod' && env.ECS_SERVICE_NAME_PROD || env.ECS_SERVICE_NAME_DEV }}
+        run: |
+          echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
