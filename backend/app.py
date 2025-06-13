@@ -1,4 +1,3 @@
-# TEST CHANGE for CI/CD pipeline
 import os
 import boto3
 import logging
