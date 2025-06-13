@@ -20,7 +20,7 @@ env:
   CLOUDFRONT_DISTRIBUTION_ID_PROD: "your-PROD-cloudfront-dist-id"
   ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster" # Your dev ECS cluster name
   ECS_CLUSTER_NAME_PROD: "your-PROD-ecs-cluster-name"
-  ECS_SERVICE_NAME_DEV: "your-DEV-ecs-service-name"
+  ECS_SERVICE_NAME_DEV: "file-sharing-app-dev-service"
   ECS_SERVICE_NAME_PROD: "your-PROD-ecs-service-name"
   REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca" # The single public URL for your app
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
@@ -53,6 +53,13 @@ jobs:
             infra:
               - 'terraform/**'
 
+      # --- ADD THIS NEW STEP ---
+      - name: Debug filter output
+        run: |
+          echo "Backend changed: ${{ steps.filter.outputs.backend }}"
+          echo "Frontend changed: ${{ steps.filter.outputs.frontend }}"
+          echo "Infra changed: ${{ steps.filter.outputs.infra }}"
+          
   # 5. JOB: DEPLOY INFRASTRUCTURE (TERRAFORM)
   deploy-infra:
     name: Deploy Infrastructure
