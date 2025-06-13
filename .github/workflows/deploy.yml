@@ -1,0 +1,147 @@
+# .github/workflows/deploy.yml
+
+name: CI & CD Pipeline for AWS FileShare App
+
+# 1. TRIGGER: This workflow runs on a push to the main or dev branches.
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+# 2. CONFIGURATION: Central place to set variables for your AWS resources.
+#    REPLACE THESE PLACEHOLDER VALUES WITH YOUR ACTUAL RESOURCE NAMES.
+env:
+  AWS_REGION: "us-east-2"
+  ECR_REPOSITORY: "file-sharing-app-dev-flask-app" # Your ECR repository name
+  FRONTEND_S3_BUCKET_DEV: "file-sharing-app-37016c887ae9d041" # Your dev S3 bucket
+  FRONTEND_S3_BUCKET_PROD: "your-PROD-frontend-bucket-name" # Your prod S3 bucket
+  CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
+  CLOUDFRONT_DISTRIBUTION_ID_PROD: "your-PROD-cloudfront-dist-id"
+  ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster" # Your dev ECS cluster name
+  ECS_CLUSTER_NAME_PROD: "your-PROD-ecs-cluster-name"
+  ECS_SERVICE_NAME_DEV: "your-DEV-ecs-service-name"
+  ECS_SERVICE_NAME_PROD: "your-PROD-ecs-service-name"
+  REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca" # The single public URL for your app
+  IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
+
+# 3. PERMISSIONS: Required for the OIDC connection to AWS to work.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # 4. JOB: DETECT CHANGES
+  #    This job runs first to see what changed, making the pipeline efficient.
+  detect-changes:
+    name: Detect File Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            infra:
+              - 'terraform/**'
+
+  # 5. JOB: DEPLOY INFRASTRUCTURE (TERRAFORM)
+  deploy-infra:
+    name: Deploy Infrastructure
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infra == 'true' # Only run if terraform files changed
+    runs-on: ubuntu-latest
+    env:
+      TF_ENV: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Terraform Apply
+        id: apply
+        run: |
+          cd terraform/environments/${{ env.TF_ENV }}
+          terraform init
+          terraform validate
+          terraform apply -auto-approve -var-file=${{ env.TF_ENV }}.tfvars
+
+  # 6. JOB: DEPLOY BACKEND (FLASK APP)
+  deploy-backend:
+    name: Build and Deploy Backend
+    needs: [detect-changes, deploy-infra]
+    if: success() && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.infra == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend # Go to the backend directory
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Update ECS Service
+        env:
+          ECS_CLUSTER: ${{ github.ref_name == 'main' && env.ECS_CLUSTER_NAME_PROD || env.ECS_CLUSTER_NAME_DEV }}
+          ECS_SERVICE: ${{ github.ref_name == 'main' && env.ECS_SERVICE_NAME_PROD || env.ECS_SERVICE_NAME_DEV }}
+        run: |
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+
+  # 7. JOB: DEPLOY FRONTEND (REACT APP)
+  deploy-frontend:
+    name: Build and Deploy Frontend
+    needs: [detect-changes, deploy-infra]
+    if: success() && (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.infra == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies and build
+        run: |
+          cd frontend # Go to the frontend directory
+          npm ci
+          npm run build
+        env:
+          REACT_APP_BACKEND_API_URL: ${{ env.REACT_APP_BACKEND_API_URL }}
+      - name: Deploy static site to S3
+        env:
+          S3_BUCKET: ${{ github.ref_name == 'main' && env.FRONTEND_S3_BUCKET_PROD || env.FRONTEND_S3_BUCKET_DEV }}
+        run: aws s3 sync ./frontend/build s3://$S3_BUCKET --delete
+      - name: Invalidate CloudFront cache
+        env:
+          CLOUDFRONT_ID: ${{ github.ref_name == 'main' && env.CLOUDFRONT_DISTRIBUTION_ID_PROD || env.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
+        run: aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
