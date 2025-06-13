@@ -48,6 +48,10 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          # Tell the filter to explicitly compare the last commit (HEAD)
+          # against its direct parent (HEAD~1).
+          base: 'HEAD~1'
+          head: 'HEAD'
           filters: |
             backend:
               - 'backend/**'
@@ -56,7 +60,6 @@ jobs:
             infra:
               - 'terraform/**'
 
-      # --- ADD THIS NEW STEP ---
       - name: Debug filter output
         run: |
           echo "Backend changed: ${{ steps.filter.outputs.backend }}"
