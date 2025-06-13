@@ -1,12 +1,10 @@
-# .github/workflows/deploy-backend.yml
+# .github/workflows/deploy-frontend.yml
 
-name: Manually Deploy Backend
+name: Manually Deploy Frontend
 
-# This section allows the workflow to be triggered manually from the Actions tab
 on:
   workflow_dispatch:
     inputs:
-      # This creates a dropdown menu to select the branch to deploy
       branch:
         description: 'Branch to deploy from'
         required: true
@@ -16,28 +14,27 @@ on:
         - dev
         - main
 
-# --- THIS ENV BLOCK HAS BEEN ADDED BACK IN ---
-# It defines all the variables needed for the deployment steps.
 env:
   AWS_REGION: "us-east-2"
-  ECR_REPOSITORY: "file-sharing-app-dev-flask-app"
-  ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster"
-  ECS_CLUSTER_NAME_PROD: "your-PROD-ecs-cluster-name" # Placeholder for prod
-  ECS_SERVICE_NAME_DEV: "file-sharing-app-dev-service"
-  ECS_SERVICE_NAME_PROD: "your-PROD-ecs-service-name" # Placeholder for prod
+  FRONTEND_S3_BUCKET_DEV: "file-sharing-app-37016c887ae9d041"
+  FRONTEND_S3_BUCKET_PROD: "your-PROD-frontend-bucket-name"
+  CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
+  CLOUDFRONT_DISTRIBUTION_ID_PROD: "your-PROD-cloudfront-dist-id"
+  REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
+
+# --- THIS PERMISSIONS BLOCK HAS BEEN ADDED ---
+permissions:
+  id-token: write # Required for OIDC authentication with AWS
+  contents: read  # Required for actions/checkout
 
 jobs:
   deploy:
-    name: Build and Deploy Backend
+    name: Build and Deploy Frontend
     runs-on: ubuntu-latest
-
-    # This logic now reads from the manual dropdown input to set the environment name
     env:
       TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
-
     steps:
-      # We check out the specific branch you selected in the dropdown
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -49,24 +46,28 @@ jobs:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Install dependencies and build
         run: |
-          cd backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-      - name: Update ECS Service
+          cd frontend
+          npm ci
+          npm run build
         env:
-          ECS_CLUSTER: ${{ env.TARGET_ENV == 'prod' && env.ECS_CLUSTER_NAME_PROD || env.ECS_CLUSTER_NAME_DEV }}
-          ECS_SERVICE: ${{ env.TARGET_ENV == 'prod' && env.ECS_SERVICE_NAME_PROD || env.ECS_SERVICE_NAME_DEV }}
+          REACT_APP_BACKEND_API_URL: ${{ env.REACT_APP_BACKEND_API_URL }}
+
+      - name: Deploy static site to S3
+        env:
+          S3_BUCKET: ${{ env.TARGET_ENV == 'prod' && env.FRONTEND_S3_BUCKET_PROD || env.FRONTEND_S3_BUCKET_DEV }}
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+          aws s3 sync ./frontend/build s3://$S3_BUCKET --delete
+
+      - name: Invalidate CloudFront cache
+        env:
+          CLOUDFRONT_ID: ${{ env.TARGET_ENV == 'prod' && env.CLOUDFRONT_DISTRIBUTION_ID_PROD || env.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
+        run: |
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
