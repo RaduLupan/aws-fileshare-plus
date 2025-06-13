@@ -3,10 +3,8 @@
 name: Manually Deploy Backend
 
 on:
-  # This makes the workflow manually triggerable from the Actions tab
   workflow_dispatch:
     inputs:
-      # This creates a dropdown menu to select the branch
       branch:
         description: 'Branch to deploy from'
         required: true
@@ -16,17 +14,27 @@ on:
         - dev
         - main
 
+env:
+  AWS_REGION: "us-east-2"
+  ECR_REPOSITORY: "file-sharing-app-dev-flask-app"
+  ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster"
+  ECS_CLUSTER_NAME_PROD: "your-PROD-ecs-cluster-name"
+  ECS_SERVICE_NAME_DEV: "file-sharing-app-dev-service"
+  ECS_SERVICE_NAME_PROD: "your-PROD-ecs-service-name"
+  IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
+
+# --- THIS PERMISSIONS BLOCK HAS BEEN ADDED ---
+permissions:
+  id-token: write # Required for OIDC authentication with AWS
+  contents: read  # Required for actions/checkout
+
 jobs:
   deploy:
     name: Build and Deploy Backend
     runs-on: ubuntu-latest
-
-    # This logic now reads from the manual dropdown input
     env:
       TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
-
     steps:
-      # We check out the specific branch you selected
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
