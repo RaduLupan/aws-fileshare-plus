@@ -1,0 +1,72 @@
+# .github/workflows/deploy-frontend.yml
+
+name: Manually Deploy Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy from'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - main
+
+env:
+  AWS_REGION: "us-east-2"
+  FRONTEND_S3_BUCKET_DEV: "file-sharing-app-37016c887ae9d041"
+  FRONTEND_S3_BUCKET_PROD: "your-PROD-frontend-bucket-name" # Placeholder for prod
+  CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
+  CLOUDFRONT_DISTRIBUTION_ID_PROD: "your-PROD-cloudfront-dist-id" # Placeholder for prod
+  REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca"
+  IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
+
+permissions:
+  id-token: write # Required for OIDC authentication with AWS
+  contents: read  # Required for actions/checkout
+
+jobs:
+  deploy:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+    env:
+      TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+        env:
+          REACT_APP_BACKEND_API_URL: ${{ env.REACT_APP_BACKEND_API_URL }}
+
+      - name: Deploy static site to S3
+        env:
+          S3_BUCKET: ${{ env.TARGET_ENV == 'prod' && env.FRONTEND_S3_BUCKET_PROD || env.FRONTEND_S3_BUCKET_DEV }}
+        run: |
+          echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
+          aws s3 sync ./frontend/build s3://$S3_BUCKET --delete
+
+      - name: Invalidate CloudFront cache
+        env:
+          CLOUDFRONT_ID: ${{ env.TARGET_ENV == 'prod' && env.CLOUDFRONT_DISTRIBUTION_ID_PROD || env.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
+        run: |
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
