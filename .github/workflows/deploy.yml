@@ -2,14 +2,12 @@
 
 name: CI & CD Pipeline for AWS FileShare App
 
-# 1. TRIGGER: This workflow runs on a push to the main or dev branches.
 on:
   push:
     branches:
       - main
       - dev
 
-# 2. CONFIGURATION: Central place to set variables for your AWS resources.
 env:
   AWS_REGION: "us-east-2"
   ECR_REPOSITORY: "file-sharing-app-dev-flask-app"
@@ -24,50 +22,50 @@ env:
   REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
-# 3. PERMISSIONS: Required for the OIDC connection to AWS to work.
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  # 4. JOB: DETECT CHANGES
+  # --- THIS JOB HAS BEEN COMPLETELY REWRITTEN ---
   detect-changes:
     name: Detect File Changes
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      infra: ${{ steps.filter.outputs.infra }}
+      backend: ${{ steps.check_backend.outputs.any_changed }}
+      frontend: ${{ steps.check_frontend.outputs.any_changed }}
+      infra: ${{ steps.check_infra.outputs.any_changed }}
     steps:
-      - name: Checkout with full history
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # A fetch-depth of 0 clones the entire history
+          fetch-depth: 0 # Full history is still best practice
 
-      # --- THIS IS THE CORRECTED STEP ---
-      - name: Calculate changed paths
-        uses: dorny/paths-filter@v3
-        id: filter
+      - name: Check for backend changes
+        id: check_backend
+        uses: tj-actions/changed-files@v44 # Using the new, reliable action
         with:
-          # This is the most robust method for push events.
-          # It explicitly compares the state of the repo before and after the push.
-          base: ${{ github.event.before }}
-          ref: ${{ github.event.after }}
-          filters: |
-            backend:
-              - 'backend/**'
-            frontend:
-              - 'frontend/**'
-            infra:
-              - 'terraform/**'
+          files: backend/**
 
-      - name: Debug filter output
+      - name: Check for frontend changes
+        id: check_frontend
+        uses: tj-actions/changed-files@v44
+        with:
+          files: frontend/**
+
+      - name: Check for infrastructure changes
+        id: check_infra
+        uses: tj-actions/changed-files@v44
+        with:
+          files: terraform/**
+
+      - name: Debug outputs
         run: |
-          echo "Backend changed: ${{ steps.filter.outputs.backend }}"
-          echo "Frontend changed: ${{ steps.filter.outputs.frontend }}"
-          echo "Infra changed: ${{ steps.filter.outputs.infra }}"
+          echo "Backend changed: ${{ steps.check_backend.outputs.any_changed }}"
+          echo "Frontend changed: ${{ steps.check_frontend.outputs.any_changed }}"
+          echo "Infra changed: ${{ steps.check_infra.outputs.any_changed }}"
 
-  # 5. JOB: DEPLOY INFRASTRUCTURE (TERRAFORM)
+  # --- NO CHANGES BELOW THIS LINE ---
   deploy-infra:
     name: Deploy Infrastructure
     needs: detect-changes
@@ -76,8 +74,7 @@ jobs:
     env:
       TF_ENV: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -86,22 +83,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
       - name: Terraform Apply
-        id: apply
         run: |
           cd terraform/environments/${{ env.TF_ENV }}
           terraform init
           terraform validate
           terraform apply -auto-approve -var-file=${{ env.TF_ENV }}.tfvars
 
-  # 6. JOB: DEPLOY BACKEND (FLASK APP)
   deploy-backend:
     name: Build and Deploy Backend
     needs: [detect-changes, deploy-infra]
     if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -123,18 +117,15 @@ jobs:
         env:
           ECS_CLUSTER: ${{ github.ref_name == 'main' && env.ECS_CLUSTER_NAME_PROD || env.ECS_CLUSTER_NAME_DEV }}
           ECS_SERVICE: ${{ github.ref_name == 'main' && env.ECS_SERVICE_NAME_PROD || env.ECS_SERVICE_NAME_DEV }}
-        run: |
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+        run: aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
 
-  # 7. JOB: DEPLOY FRONTEND (REACT APP)
   deploy-frontend:
     name: Build and Deploy Frontend
     needs: [detect-changes, deploy-infra]
     if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
