@@ -17,7 +17,6 @@ app = Flask(__name__)
 CORS(app)
 # Allow specific origins for development/testing
 #CORS(app, resources={r"/*": {"origins": ["http://d2v0ilknbuwszz.cloudfront.net", "http://localhost:3000"]}})
-# Allow all origins for development/testing
 #CORS(app, resources={r"/*": {"origins": "*"}})
 # Note: In production, you should restrict origins to your frontend domain(s) for security.
 
