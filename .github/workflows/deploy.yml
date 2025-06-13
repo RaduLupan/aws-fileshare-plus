@@ -93,7 +93,7 @@ jobs:
   deploy-backend:
     name: Build and Deploy Backend
     needs: [detect-changes, deploy-infra]
-    if: success() && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.infra == 'true')
+    if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -126,7 +126,7 @@ jobs:
   deploy-frontend:
     name: Build and Deploy Frontend
     needs: [detect-changes, deploy-infra]
-    if: success() && (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.infra == 'true')
+    if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
