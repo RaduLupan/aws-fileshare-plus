@@ -41,7 +41,10 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       infra: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # A fetch-depth of 0 clones the entire history
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -59,7 +62,7 @@ jobs:
           echo "Backend changed: ${{ steps.filter.outputs.backend }}"
           echo "Frontend changed: ${{ steps.filter.outputs.frontend }}"
           echo "Infra changed: ${{ steps.filter.outputs.infra }}"
-          
+
   # 5. JOB: DEPLOY INFRASTRUCTURE (TERRAFORM)
   deploy-infra:
     name: Deploy Infrastructure
