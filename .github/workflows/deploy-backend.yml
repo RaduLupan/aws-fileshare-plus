@@ -16,11 +16,11 @@ on:
 
 env:
   AWS_REGION: "us-east-2"
-  ECR_REPOSITORY: "file-sharing-app-dev-flask-app"
+  ECR_REPOSITORY: "prod-file-sharing-app-prod-flask-app"
   ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster"
-  ECS_CLUSTER_NAME_PROD: "your-PROD-ecs-cluster-name"
+  ECS_CLUSTER_NAME_PROD: "prod-file-sharing-app-prod-cluster"
   ECS_SERVICE_NAME_DEV: "file-sharing-app-dev-service"
-  ECS_SERVICE_NAME_PROD: "your-PROD-ecs-service-name"
+  ECS_SERVICE_NAME_PROD: "prod-file-sharing-app-prod-service"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
 # --- THIS PERMISSIONS BLOCK HAS BEEN ADDED ---
