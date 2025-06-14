@@ -17,10 +17,10 @@ on:
 env:
   AWS_REGION: "us-east-2"
   FRONTEND_S3_BUCKET_DEV: "file-sharing-app-37016c887ae9d041"
-  FRONTEND_S3_BUCKET_PROD: "your-PROD-frontend-bucket-name" # Placeholder for prod
+  FRONTEND_S3_BUCKET_PROD: "prod-file-sharing-app-3efd2edf5b72f4ea" # Placeholder for prod
   CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
-  CLOUDFRONT_DISTRIBUTION_ID_PROD: "your-PROD-cloudfront-dist-id" # Placeholder for prod
-  REACT_APP_BACKEND_API_URL: "https://cf.aws.lupan.ca"
+  CLOUDFRONT_DISTRIBUTION_ID_PROD: "E94FAJAE95E39" # Placeholder for prod
+  REACT_APP_BACKEND_API_URL: "https://cfp.aws.lupan.ca"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
 permissions:
