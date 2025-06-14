@@ -2,7 +2,7 @@ aws_region         = "us-east-2"
 availability_zones = ["us-east-2a", "us-east-2b"]
 
 environment  = "prod"
-project_name = "PROD-file-sharing-app"
+project_name = "prod-file-sharing-app"
 
 cloudfront_custom_domain_name = "cfp.aws.lupan.ca"
 alb_custom_domain_name        = "albp.aws.lupan.ca"
