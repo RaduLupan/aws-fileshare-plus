@@ -12,7 +12,7 @@ resource "aws_ecs_cluster" "this" {
 
 # Add ECR Repository here
 resource "aws_ecr_repository" "flask_app" {
-  name                 = "${var.project_name}-${var.environment}-flask-app"
+  name                 = lower("${var.project_name}-${var.environment}-flask-app")
   image_tag_mutability = "MUTABLE" # Or "IMMUTABLE" for production environments
   image_scanning_configuration {
     scan_on_push = true # Enable image scanning for security

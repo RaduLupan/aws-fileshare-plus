@@ -2,7 +2,7 @@
 
 # Create an S3 bucket for file uploads
 resource "aws_s3_bucket" "uploads_backend" {
-  bucket = "${var.s3_uploads_bucket_name_prefix}-${random_id.uploads_bucket_suffix.hex}"
+  bucket = lower("${var.s3_uploads_bucket_name_prefix}-${random_id.uploads_bucket_suffix.hex}")
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-file-uploads"

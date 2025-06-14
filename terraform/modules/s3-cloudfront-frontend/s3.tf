@@ -2,8 +2,9 @@
 
 # Create an S3 bucket for the React frontend
 resource "aws_s3_bucket" "this" {
-  bucket = "${var.bucket_name_prefix}-${random_id.bucket_suffix.hex}"
+  bucket = lower("${var.bucket_name_prefix}-${random_id.bucket_suffix.hex}")
   tags = {
+    Name        = "${var.bucket_name_prefix}-${var.environment}-frontend"
     Environment = var.environment
     Service     = "Frontend"
   }
