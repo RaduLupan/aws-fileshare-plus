@@ -16,7 +16,7 @@ on:
 
 env:
   AWS_REGION: "us-east-2"
-  ECR_REPOSITORY_NAME: "prod-file-sharing-app-prod-flask-app"
+  ECR_REPOSITORY_NAME: "file-sharing-app-radulupan-test"
   ECS_CLUSTER_NAME_DEV: "file-sharing-app-dev-cluster"
   ECS_CLUSTER_NAME_PROD: "prod-file-sharing-app-prod-cluster"
   ECS_SERVICE_NAME_DEV: "file-sharing-app-dev-service"
