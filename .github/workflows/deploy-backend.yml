@@ -65,9 +65,9 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           # The primary tag is the unique Git SHA for perfect traceability
-		  COMMIT_SHA_TAG: ${{ github.sha }}
+		      COMMIT_SHA_TAG: ${{ github.sha }}
           # The pointer tag is the branch name, which Terraform uses
-		  BRANCH_TAG: ${{ github.event.inputs.branch }}
+		      BRANCH_TAG: ${{ github.event.inputs.branch }}
         run: |
           cd backend
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG .
