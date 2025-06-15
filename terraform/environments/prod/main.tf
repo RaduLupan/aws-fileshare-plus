@@ -107,3 +107,8 @@ output "ecs_service_name" {
   description = "The name of the ECS service."
   value       = module.backend_app.ecs_service_name
 }
+
+output "cloudfront_distribution_id" {
+  description = "The ID of the CloudFront distribution."
+  value       = module.frontend_app.cloudfront_distribution_id
+}
