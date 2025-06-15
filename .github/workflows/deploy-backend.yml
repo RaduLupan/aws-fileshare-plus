@@ -23,7 +23,6 @@ env:
   ECS_SERVICE_NAME_PROD: "prod-file-sharing-app-prod-service"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
-# --- THIS PERMISSIONS BLOCK HAS BEEN ADDED ---
 permissions:
   id-token: write # Required for OIDC authentication with AWS
   contents: read  # Required for actions/checkout
@@ -50,15 +49,29 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # --- THIS STEP HAS BEEN UPDATED ---
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: "latest"
+          # The primary tag is the unique Git SHA for perfect traceability
+          COMMIT_SHA_TAG: ${{ github.sha }}
+          # The pointer tag is the branch name, which Terraform uses
+          BRANCH_TAG: ${{ github.event.inputs.branch }}
         run: |
           cd backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG
+          # Build the image once
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG .
+          
+          # Add the branch name as a second tag to the same image
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$BRANCH_TAG
+          
+          # Push both tags to ECR
+          echo "Pushing tag: $COMMIT_SHA_TAG"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG
+          
+          echo "Pushing tag: $BRANCH_TAG"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$BRANCH_TAG
 
       - name: Update ECS Service
         env:
@@ -66,4 +79,7 @@ jobs:
           ECS_SERVICE: ${{ env.TARGET_ENV == 'prod' && env.ECS_SERVICE_NAME_PROD || env.ECS_SERVICE_NAME_DEV }}
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
+          # This command tells ECS to pull the latest image matching the branch tag
+          # (e.g., 'dev' or 'main') which we just updated in ECR.
           aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+
