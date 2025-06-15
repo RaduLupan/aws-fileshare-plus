@@ -80,7 +80,7 @@ module "backend_app" {
 # Output relevant values from the modules
 output "frontend_cloudfront_url" {
   description = "The URL of the deployed frontend application."
-  value       = "http://${module.frontend_app.cloudfront_domain_name}"
+  value       = "https://${module.frontend_app.cloudfront_domain_name}"
 }
 
 output "s3_react_bucket_name" {
@@ -90,7 +90,7 @@ output "s3_react_bucket_name" {
 
 output "backend_alb_url" {
   description = "The URL of the backend ALB."
-  value       = "http://${module.backend_app.alb_dns_name}" # Use http for now, update to https when ALB has certificate
+  value       = "https://${module.backend_app.alb_dns_name}" # Use http for now, update to https when ALB has certificate
 }
 
 output "s3_uploads_bucket_name" {
