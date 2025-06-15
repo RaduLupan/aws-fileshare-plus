@@ -4,17 +4,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Define your remote backend here
-# terraform {
-#   backend "s3" {
-#     bucket         = "your-dev-terraform-state-bucket" # Create this bucket manually once
-#     key            = "frontend/state"
-#     region         = "us-east-1"
-#     dynamodb_table = "your-dev-terraform-state-lock" # Create this DynamoDB table manually once
-#     encrypt        = true
-#   }
-# }
-
 # Call the network module first to create VPC, subnets, and other networking resources
 module "network" {
   source = "../../modules/network" # Path to your network module
@@ -86,12 +75,12 @@ module "backend_app" {
 }
 
 # Output relevant values from the modules
-output "frontend_url" {
+output "frontend_cloudfront_url" {
   description = "The URL of the deployed frontend application."
   value       = "http://${module.frontend_app.cloudfront_domain_name}"
 }
 
-output "react_s3_bucket_name" {
+output "s3_react_bucket_name" {
   description = "The S3 bucket name for the React frontend."
   value       = module.frontend_app.s3_bucket_name
 }

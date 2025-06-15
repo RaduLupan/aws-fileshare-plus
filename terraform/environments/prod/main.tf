@@ -75,12 +75,12 @@ module "backend_app" {
 }
 
 # Output relevant values from the modules
-output "frontend_url" {
+output "frontend_cloudfront_url" {
   description = "The URL of the deployed frontend application."
   value       = "http://${module.frontend_app.cloudfront_domain_name}"
 }
 
-output "react_s3_bucket_name" {
+output "s3_react_bucket_name" {
   description = "The S3 bucket name for the React frontend."
   value       = module.frontend_app.s3_bucket_name
 }
