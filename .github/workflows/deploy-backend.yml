@@ -22,8 +22,8 @@ env:
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
 permissions:
-  id-token: write # Required for OIDC authentication with AWS
-  contents: read # Required for actions/checkout
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
@@ -64,10 +64,8 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          # The primary tag is the unique Git SHA for perfect traceability
-		      COMMIT_SHA_TAG: ${{ github.sha }}
-          # The pointer tag is the branch name, which Terraform uses
-		      BRANCH_TAG: ${{ github.event.inputs.branch }}
+          COMMIT_SHA_TAG: ${{ github.sha }}
+          BRANCH_TAG: ${{ github.event.inputs.branch }}
         run: |
           cd backend
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG .
