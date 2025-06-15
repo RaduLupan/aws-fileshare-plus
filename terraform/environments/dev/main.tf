@@ -37,7 +37,7 @@ module "frontend_app" {
 
   # Pass backend ALB details for CloudFront proxying
   backend_alb_dns_name = module.backend_app.alb_dns_name # the raw ALB DNS name. var.alb_custom_domain_name also works if you want to use a custom domain for the ALB  
-  alb_http_port        = var.alb_http_port_for_frontend # From a new variable in dev/variables.tf
+  alb_http_port        = var.alb_http_port_for_frontend  # From a new variable in dev/variables.tf
   alb_https_port       = var.alb_https_port_for_frontend # From a new variable in dev/variables.tf
 }
 
@@ -45,31 +45,34 @@ module "frontend_app" {
 module "backend_app" {
   source = "../../modules/ecs-flask-backend"
 
-  project_name                   = var.project_name
-  environment                    = var.environment
-  aws_region                     = var.aws_region # Pass the region to backend module
-  
-  vpc_id                         = module.network.vpc_id
-  public_subnet_ids              = module.network.public_subnet_ids
-  private_subnet_ids             = module.network.private_subnet_ids
-  alb_security_group_id          = module.network.alb_security_group_id
-  
-  ecs_tasks_security_group_id    = module.network.ecs_tasks_security_group_id
-  container_port                 = 5000
-  
-  cpu                            = 256
-  memory                         = 512
-  desired_count                  = 0     # Explicitly set to 0 for dev environment's initial deploy
-  
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region # Pass the region to backend module
+
+  vpc_id                = module.network.vpc_id
+  public_subnet_ids     = module.network.public_subnet_ids
+  private_subnet_ids    = module.network.private_subnet_ids
+  alb_security_group_id = module.network.alb_security_group_id
+
+  ecr_repository_url = "481509955802.dkr.ecr.us-east-2.amazonaws.com/file-sharing-app-radulupan-test" # Update with your ECR repository URL
+  image_tag          = "dev"
+
+  ecs_tasks_security_group_id = module.network.ecs_tasks_security_group_id
+  container_port              = 5000
+
+  cpu           = 256
+  memory        = 512
+  desired_count = 0 # Explicitly set to 0 for dev environment's initial deploy
+
   enable_alb_deletion_protection = false # Set to true for production environments
   alb_health_check_path          = "/"
 
   alb_listener_http_port  = 80
   alb_listener_https_port = 443
 
-  enable_https_listener         = var.alb_enable_https_listener # Set to true to enable HTTPS, and provide alb_https_certificate_arn
-  alb_https_certificate_arn     = var.alb_https_certificate_arn # Uncomment and provide if enable_https_listener is true
-  
+  enable_https_listener     = var.alb_enable_https_listener # Set to true to enable HTTPS, and provide alb_https_certificate_arn
+  alb_https_certificate_arn = var.alb_https_certificate_arn # Uncomment and provide if enable_https_listener is true
+
   s3_uploads_bucket_name_prefix = "${var.project_name}-${var.environment}-uploads"
   log_retention_in_days         = 30
 }

@@ -1,4 +1,4 @@
-# terraform/modules/ecs-flask-backend/main.tf (Updated)
+# terraform/modules/ecs-flask-backend/main.tf
 
 # Create an ECS cluster
 resource "aws_ecs_cluster" "this" {
@@ -10,19 +10,8 @@ resource "aws_ecs_cluster" "this" {
   }
 }
 
-# Add ECR Repository here
-resource "aws_ecr_repository" "flask_app" {
-  name                 = lower("${var.project_name}-${var.environment}-flask-app")
-  image_tag_mutability = "MUTABLE" # Or "IMMUTABLE" for production environments
-  image_scanning_configuration {
-    scan_on_push = true # Enable image scanning for security
-  }
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
+# NOTE: The aws_ecr_repository resource has been removed from this module.
+# The repository is now considered a global resource, managed outside of this module.
 
 # Create the ECS task definition
 resource "aws_ecs_task_definition" "flask" {
@@ -36,10 +25,11 @@ resource "aws_ecs_task_definition" "flask" {
   task_role_arn      = aws_iam_role.flask_app_task.arn     # Role for your application container
 
   container_definitions = jsonencode([{
-    name        = "${var.project_name}-${var.environment}-flask-container"
-    # IMPORTANT: Reference the ECR repository URI dynamically
-    image       = "${aws_ecr_repository.flask_app.repository_url}:latest" # Or use a specific tag like "v1.0.0"
-    essential   = true
+    name      = "${var.project_name}-${var.environment}-flask-container"
+    # IMPORTANT: The image is now composed from variables passed into the module.
+    # This decouples the module from the ECR repository and the image tag.
+    image     = "${var.ecr_repository_url}:${var.image_tag}"
+    essential = true
     portMappings = [{
       containerPort = var.container_port
       hostPort      = var.container_port
@@ -78,7 +68,7 @@ resource "aws_ecs_service" "this" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
-  health_check_grace_period_seconds  = 60
+  health_check_grace_period_seconds = 60
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
 
@@ -98,11 +88,10 @@ resource "aws_ecs_service" "this" {
   propagate_tags          = "SERVICE"
 
   # CORRECT FIX for depends_on with conditional resources
-  # List the resource that might have count=0. Terraform handles it.
+  # NOTE: The dependency on aws_ecr_repository.flask_app has been removed.
   depends_on = [
     aws_lb_listener.http,
     aws_lb_listener.https, # Refer to the resource, even if its count is 0
-    aws_ecr_repository.flask_app # Still depend on ECR repo
   ]
 
   tags = {

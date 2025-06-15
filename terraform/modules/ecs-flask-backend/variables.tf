@@ -44,6 +44,16 @@ variable "ecs_tasks_security_group_id" {
   type        = string
 }
 
+variable "ecr_repository_url" {
+  description = "The URL of the ECR repository for the Flask application."
+  type        = string
+}
+
+variable "image_tag" {
+  description = "The tag of the Docker image to deploy (e.g., 'dev', 'main', 'a1b2c3d4')."
+  type        = string
+}
+
 #---------------------------------------------------------------
 # OPTIONAL PARAMETERS: These parameters have resonable defaults.
 #---------------------------------------------------------------
