@@ -97,3 +97,13 @@ output "s3_uploads_bucket_name" {
   description = "The S3 bucket name for file uploads."
   value       = module.backend_app.uploads_s3_bucket_name
 }
+
+output "ecs_cluster_name" {
+  description = "The name of the ECS cluster."
+  value       = module.backend_app.ecs_cluster_name
+}
+
+output "ecs_service_name" {
+  description = "The name of the ECS service."
+  value       = module.backend_app.ecs_service_name
+}
