@@ -92,8 +92,8 @@ jobs:
       - name: Terraform Apply
         run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} apply -auto-approve tfplan
 
-        # This step writes the Terraform outputs to AWS SSM Parameter Store
-        - name: Write Terraform Outputs to SSM Parameter Store
+      # This step writes the Terraform outputs to AWS SSM Parameter Store
+      - name: Write Terraform Outputs to SSM Parameter Store
         id: ssm-outputs
         run: |
           echo "Writing Terraform outputs to SSM Parameter Store..."
