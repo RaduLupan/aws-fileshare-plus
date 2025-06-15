@@ -16,8 +16,8 @@ on:
 
 env:
   AWS_REGION: "us-east-2"
-  FRONTEND_S3_BUCKET_DEV: "file-sharing-app-37016c887ae9d041"
-  FRONTEND_S3_BUCKET_PROD: "prod-file-sharing-app-3efd2edf5b72f4ea" # Placeholder for prod
+  FRONTEND_S3_BUCKET_NAME_DEV: "file-sharing-app-37016c887ae9d041"
+  FRONTEND_S3_BUCKET_NAME_PROD: "prod-file-sharing-app-3efd2edf5b72f4ea" # Placeholder for prod
   CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
   CLOUDFRONT_DISTRIBUTION_ID_PROD: "E94FAJAE95E39" # Placeholder for prod
   REACT_APP_BACKEND_API_URL: "https://cfp.aws.lupan.ca"
@@ -60,7 +60,7 @@ jobs:
 
       - name: Deploy static site to S3
         env:
-          S3_BUCKET: ${{ env.TARGET_ENV == 'prod' && env.FRONTEND_S3_BUCKET_PROD || env.FRONTEND_S3_BUCKET_DEV }}
+          S3_BUCKET: ${{ env.TARGET_ENV == 'prod' && env.FRONTEND_S3_BUCKET_NAME_PROD || env.FRONTEND_S3_BUCKET_NAME_DEV }}
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
           aws s3 sync ./frontend/build s3://$S3_BUCKET --delete
