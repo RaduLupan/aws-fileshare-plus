@@ -32,15 +32,13 @@ jobs:
     env:
       TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
     steps:
-      # --- THIS IS THE NEW FIRST STEP ---
-      - name: Fetch Configuration from SSM
-        id: get-config
+      # --- THIS IS NOW THE ONLY CREDENTIALS STEP ---
+      # It both authenticates and fetches the SSM parameters.
+      - name: Configure AWS Credentials and Fetch SSM Parameters
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          # This command uses the AWS CLI to get parameters from SSM
-          # and makes them available as environment variables for all subsequent steps.
           mask-aws-account-id: 'false'
         env:
           AWS_SSM_PATH: /fileshare/${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
@@ -50,11 +48,8 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+      # NOTE: The second 'Configure AWS credentials' step has been removed.
+      # The credentials from the first step are used by all subsequent steps.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -76,11 +71,9 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$BRANCH_TAG
 
       - name: Update ECS Service
-        # NOTE: ECS_CLUSTER and ECS_SERVICE are no longer set here.
-        # They now come directly from the SSM step above.
+        # NOTE: ECS_CLUSTER_NAME and ECS_SERVICE_NAME now come directly from the first step.
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
           echo "Using Cluster: ${{ env.ECS_CLUSTER_NAME }}"
           echo "Updating Service: ${{ env.ECS_SERVICE_NAME }}"
-          aws ecs update-service --cluster ${{ env.ECS_CLUSTER_NAME }} --service ${{ env.ECS_SERVICE_NAME }} --force-new-deployment
-
+          aws ecs update-service --cluster "${{ env.ECS_CLUSTER_NAME }}" --service "${{ env.ECS_SERVICE_NAME }}" --force-new-deployment
