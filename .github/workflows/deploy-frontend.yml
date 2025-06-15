@@ -95,8 +95,8 @@ jobs:
       - name: Deploy static site to S3
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          # Note: The bucket name now comes from the SSM parameter 'S3_REACT_BUCKET'
-          aws s3 sync ./frontend/build s3://${{ env.S3_REACT_BUCKET }} --delete
+          # CORRECTED: The bucket name now uses the correct variable from SSM
+          aws s3 sync ./frontend/build s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
