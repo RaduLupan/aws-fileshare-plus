@@ -39,15 +39,38 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: 'false'
 
-      # --- STEP 2: Explicitly fetch SSM parameters ---
+      # --- STEP 2: Explicitly fetch SSM parameters (SIMPLIFIED SCRIPT) ---
       - name: Fetch Configuration from SSM Parameter Store
         run: |
           echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
-          # Get parameters, transform them to VAR_NAME=VALUE format,
-          # convert the name to uppercase, and append to the job's environment file.
-          aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json | \
-          jq -r '.[] | .Name + "=" + .Value' | \
-          sed -e "s|/fileshare/${{ env.TARGET_ENV }}/||" -e 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/' >> $GITHUB_ENV
+          
+          # Fetch the parameters as JSON
+          PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json)
+          
+          # Check if any parameters were returned
+          if [ -z "$PARAMS_JSON" ] || [ "$PARAMS_JSON" == "[]" ]; then
+            echo "No parameters found at the specified path."
+            exit 1
+          fi
+
+          # Loop through each parameter in the JSON array
+          echo "$PARAMS_JSON" | jq -c '.[]' | while read -r line; do
+            # Extract the full name and value
+            PARAM_NAME=$(echo "$line" | jq -r '.Name')
+            PARAM_VALUE=$(echo "$line" | jq -r '.Value')
+
+            # Get the short name by removing the prefix (e.g., ecs_cluster_name)
+            VAR_NAME_LOWER=$(basename "$PARAM_NAME")
+
+            # Convert the short name to uppercase (e.g., ECS_CLUSTER_NAME)
+            VAR_NAME_UPPER=$(echo "$VAR_NAME_LOWER" | tr '[:lower:]' '[:upper:]')
+            
+            # Print a debug message showing what will be exported
+            echo "Exporting: ${VAR_NAME_UPPER}=${PARAM_VALUE}"
+
+            # Append the export command to the GitHub environment file
+            echo "${VAR_NAME_UPPER}=${PARAM_VALUE}" >> $GITHUB_ENV
+          done
 
       - name: Checkout repository
         uses: actions/checkout@v4
