@@ -100,10 +100,10 @@ output "s3_uploads_bucket_name" {
 
 output "ecs_cluster_name" {
   description = "The name of the ECS cluster."
-  value       = module.ecs_flask_backend.ecs_cluster_name
+  value       = module.backend_app.ecs_cluster_name
 }
 
 output "ecs_service_name" {
   description = "The name of the ECS service."
-  value       = module.ecs_flask_backend.ecs_service_name
+  value       = module.backend_app.ecs_service_name
 }
