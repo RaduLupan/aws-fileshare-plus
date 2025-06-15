@@ -14,8 +14,7 @@ on:
         - dev
         - main
 
-# NOTE: This env block is now much smaller.
-# It only contains global values, not environment-specific ones.
+# NOTE: This env block only contains global values.
 env:
   AWS_REGION: "us-east-2"
   ECR_REPOSITORY_NAME: "file-sharing-app-radulupan-test"
@@ -32,24 +31,28 @@ jobs:
     env:
       TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
     steps:
-      # --- THIS IS NOW THE ONLY CREDENTIALS STEP ---
-      # It both authenticates and fetches the SSM parameters.
-      - name: Configure AWS Credentials and Fetch SSM Parameters
+      # --- STEP 1: Configure credentials ---
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: 'false'
-        env:
-          AWS_SSM_PATH: /fileshare/${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
+
+      # --- STEP 2: Explicitly fetch SSM parameters ---
+      - name: Fetch Configuration from SSM Parameter Store
+        run: |
+          echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
+          # Get parameters, transform them to VAR_NAME=VALUE format,
+          # convert the name to uppercase, and append to the job's environment file.
+          aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json | \
+          jq -r '.[] | .Name + "=" + .Value' | \
+          sed -e "s|/fileshare/${{ env.TARGET_ENV }}/||" -e 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/' >> $GITHUB_ENV
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
-
-      # NOTE: The second 'Configure AWS credentials' step has been removed.
-      # The credentials from the first step are used by all subsequent steps.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -71,9 +74,9 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$BRANCH_TAG
 
       - name: Update ECS Service
-        # NOTE: ECS_CLUSTER_NAME and ECS_SERVICE_NAME now come directly from the first step.
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
           echo "Using Cluster: ${{ env.ECS_CLUSTER_NAME }}"
           echo "Updating Service: ${{ env.ECS_SERVICE_NAME }}"
           aws ecs update-service --cluster "${{ env.ECS_CLUSTER_NAME }}" --service "${{ env.ECS_SERVICE_NAME }}" --force-new-deployment
+
