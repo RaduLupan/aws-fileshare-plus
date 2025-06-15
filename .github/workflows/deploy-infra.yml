@@ -91,3 +91,25 @@ jobs:
 
       - name: Terraform Apply
         run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} apply -auto-approve tfplan
+
+        # This step writes the Terraform outputs to AWS SSM Parameter Store
+        - name: Write Terraform Outputs to SSM Parameter Store
+        id: ssm-outputs
+        run: |
+          echo "Writing Terraform outputs to SSM Parameter Store..."
+          
+          # Change directory to where the state file is
+          cd terraform/environments/${{ env.TF_ENV }}
+
+          # Get all output names defined in the Terraform configuration
+          OUTPUTS=$(terraform output -json | jq -r 'keys_unsorted | @sh')
+
+          for OUTPUT_NAME in $OUTPUTS; do
+            # Get the value of the specific output
+            VALUE=$(terraform output -raw $OUTPUT_NAME)
+            # Construct the SSM parameter name hierarchically
+            PARAM_NAME="/fileshare/${{ env.TF_ENV }}/${OUTPUT_NAME}"
+            
+            echo "Writing $PARAM_NAME with value: $VALUE"
+            aws ssm put-parameter --name "$PARAM_NAME" --value "$VALUE" --type String --overwrite
+          done
