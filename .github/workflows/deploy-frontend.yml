@@ -14,18 +14,14 @@ on:
         - dev
         - main
 
+# NOTE: This env block only contains global and non-environment-specific values.
 env:
   AWS_REGION: "us-east-2"
-  FRONTEND_S3_BUCKET_NAME_DEV: "file-sharing-app-37016c887ae9d041"
-  FRONTEND_S3_BUCKET_NAME_PROD: "prod-file-sharing-app-3efd2edf5b72f4ea" # Placeholder for prod
-  CLOUDFRONT_DISTRIBUTION_ID_DEV: "E12N0TVJQ8PG2Q"
-  CLOUDFRONT_DISTRIBUTION_ID_PROD: "E94FAJAE95E39" # Placeholder for prod
-  REACT_APP_BACKEND_API_URL: "https://cfp.aws.lupan.ca"
   IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
 
 permissions:
-  id-token: write # Required for OIDC authentication with AWS
-  contents: read  # Required for actions/checkout
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
@@ -34,16 +30,51 @@ jobs:
     env:
       TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.branch }}
-
-      - name: Configure AWS credentials
+      # --- STEP 1: Configure credentials ---
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: 'false'
+
+      # --- STEP 2: Explicitly fetch SSM parameters ---
+      - name: Fetch Configuration from SSM Parameter Store
+        run: |
+          echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
+          
+          # Fetch the parameters as JSON
+          PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json)
+          
+          # Check if any parameters were returned
+          if [ -z "$PARAMS_JSON" ] || [ "$PARAMS_JSON" == "[]" ]; then
+            echo "No parameters found at the specified path."
+            exit 1
+          fi
+
+          # Loop through each parameter in the JSON array
+          echo "$PARAMS_JSON" | jq -c '.[]' | while read -r line; do
+            # Extract the full name and value
+            PARAM_NAME=$(echo "$line" | jq -r '.Name')
+            PARAM_VALUE=$(echo "$line" | jq -r '.Value')
+
+            # Get the short name by removing the prefix (e.g., frontend_s3_bucket)
+            VAR_NAME_LOWER=$(basename "$PARAM_NAME")
+
+            # Convert the short name to uppercase (e.g., FRONTEND_S3_BUCKET)
+            VAR_NAME_UPPER=$(echo "$VAR_NAME_LOWER" | tr '[:lower:]' '[:upper:]')
+            
+            # Print a debug message showing what will be exported
+            echo "Exporting: ${VAR_NAME_UPPER}=${PARAM_VALUE}"
+
+            # Append the export command to the GitHub environment file
+            echo "${VAR_NAME_UPPER}=${PARAM_VALUE}" >> $GITHUB_ENV
+          done
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,19 +85,20 @@ jobs:
         run: |
           cd frontend
           npm ci
+          # The REACT_APP_BACKEND_API_URL is now read from SSM
           npm run build
         env:
-          REACT_APP_BACKEND_API_URL: ${{ env.REACT_APP_BACKEND_API_URL }}
+          # This value is now dynamically set from the SSM parameter 'FRONTEND_CLOUDFRONT_URL'
+          # Assuming you have an output in terraform named 'frontend_cloudfront_url'
+          REACT_APP_BACKEND_API_URL: ${{ env.FRONTEND_CLOUDFRONT_URL }}
 
       - name: Deploy static site to S3
-        env:
-          S3_BUCKET: ${{ env.TARGET_ENV == 'prod' && env.FRONTEND_S3_BUCKET_NAME_PROD || env.FRONTEND_S3_BUCKET_NAME_DEV }}
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          aws s3 sync ./frontend/build s3://$S3_BUCKET --delete
+          # Note: The bucket name now comes from the SSM parameter 'S3_REACT_BUCKET'
+          aws s3 sync ./frontend/build s3://${{ env.S3_REACT_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
-        env:
-          CLOUDFRONT_ID: ${{ env.TARGET_ENV == 'prod' && env.CLOUDFRONT_DISTRIBUTION_ID_PROD || env.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
         run: |
-          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+          # Note: The distribution ID now comes from the SSM parameter 'CLOUDFRONT_DISTRIBUTION_ID'
+          aws cloudfront create-invalidation --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
