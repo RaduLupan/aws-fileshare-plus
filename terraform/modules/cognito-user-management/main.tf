@@ -78,7 +78,8 @@ resource "aws_lambda_function" "post_confirmation_trigger" {
 
   environment {
     variables = {
-      FREE_TIER_GROUP_NAME = aws_cognito_user_group.free_tier.name
+      # CORRECTED: Use a static string for the group name to break the dependency cycle.
+      FREE_TIER_GROUP_NAME = "free-tier"
     }
   }
 
