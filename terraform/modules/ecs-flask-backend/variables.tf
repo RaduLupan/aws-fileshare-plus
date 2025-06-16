@@ -54,6 +54,11 @@ variable "image_tag" {
   type        = string
 }
 
+variable "cognito_user_pool_id" {
+  description = "The ID of the Cognito User Pool to be used by the backend."
+  type        = string
+}
+
 #---------------------------------------------------------------
 # OPTIONAL PARAMETERS: These parameters have resonable defaults.
 #---------------------------------------------------------------
