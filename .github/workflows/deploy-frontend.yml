@@ -81,24 +81,23 @@ jobs:
         with:
           node-version: '20'
 
+      # --- THIS STEP HAS BEEN CORRECTED ---
       - name: Install dependencies and build
         run: |
           cd frontend
           npm ci
-          # The REACT_APP_BACKEND_API_URL is now read from SSM
+          # This now uses the correct URL for API calls
           npm run build
         env:
-          # This value is now dynamically set from the SSM parameter 'FRONTEND_CLOUDFRONT_URL'
-          # Assuming you have an output in terraform named 'frontend_cloudfront_url'
-          REACT_APP_BACKEND_API_URL: ${{ env.FRONTEND_CLOUDFRONT_URL }}
+          # This variable now gets its value from the 'cloudfront_custom_domain_url'
+          # parameter that you created in SSM.
+          REACT_APP_BACKEND_API_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
 
       - name: Deploy static site to S3
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          # CORRECTED: The bucket name now uses the correct variable from SSM
           aws s3 sync ./frontend/build s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
-          # Note: The distribution ID now comes from the SSM parameter 'CLOUDFRONT_DISTRIBUTION_ID'
           aws cloudfront create-invalidation --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
