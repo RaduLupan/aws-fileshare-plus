@@ -125,3 +125,13 @@ output "cloudfront_custom_domain_url" {
   # It's important to prepend "https://"
   value       = "https://${var.cloudfront_custom_domain_name}" # Assuming you pass the domain as a variable
 }
+
+output "user_pool_id" {
+  description = "The ID of the Cognito User Pool."
+  value       = module.cognito.user_pool_id
+}
+
+output "user_pool_client_id" {
+  description = "The ID of the Cognito User Pool Client."
+  value       = module.cognito.user_pool_client_id
+}
