@@ -35,6 +35,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --- NEW STEP ADDED ---
+      - name: Create Lambda Deployment Package
+        run: |
+          cd terraform/modules/cognito-user-management
+          zip add_to_group.zip add_to_group.py
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -68,6 +74,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # --- NEW STEP ADDED ---
+      - name: Create Lambda Deployment Package
+        run: |
+          cd terraform/modules/cognito-user-management
+          zip add_to_group.zip add_to_group.py
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
