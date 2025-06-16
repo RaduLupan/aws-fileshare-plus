@@ -70,7 +70,7 @@ resource "aws_lambda_function" "post_confirmation_trigger" {
   function_name    = "${var.project_name}-${var.environment}-post-confirmation-trigger"
   role             = aws_iam_role.lambda_exec_role.arn
   handler          = "add_to_group.handler"
-  runtime          = "python3.9"
+  runtime          = "python3.13"
   # This hash is now calculated directly from the .py file, so Terraform
   # will correctly detect when your Lambda code changes.
   source_code_hash = filebase64sha256("${path.module}/add_to_group.py")
