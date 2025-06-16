@@ -25,7 +25,7 @@ output "cloudfront_arn" {
   value       = aws_cloudfront_distribution.this.arn
 }
 
-output "custom_domain_url" {
+output "cloudfront_custom_domain_url" {
   description = "The custom domain URL if configured."
   value       = var.custom_domain_name != "" ? "https://${var.custom_domain_name}" : "N/A"
 }

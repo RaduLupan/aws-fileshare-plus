@@ -112,3 +112,9 @@ output "cloudfront_distribution_id" {
   description = "The ID of the CloudFront distribution."
   value       = module.frontend_app.cloudfront_distribution_id
 }
+
+output "cloudfront_custom_domain_url" {
+  description = "The custom domain URL for the CloudFront distribution."
+  # It's important to prepend "https://"
+  value       = "https://${var.cloudfront_custom_domain_name}" # Assuming you pass the domain as a variable
+}
