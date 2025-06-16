@@ -62,23 +62,21 @@ resource "aws_cognito_user_group" "premium_tier" {
 # Lambda Trigger to Add New Users to the Free Tier
 # -----------------------------------------------------------------------------
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_file = "${path.module}/add_to_group.py"
-  output_path = "${path.module}/add_to_group.zip"
-}
+# NOTE: The data "archive_file" block has been removed.
 
 resource "aws_lambda_function" "post_confirmation_trigger" {
-  filename      = data.archive_file.lambda_zip.output_path
-  function_name = "${var.project_name}-${var.environment}-post-confirmation-trigger"
-  role          = aws_iam_role.lambda_exec_role.arn
-  handler       = "add_to_group.handler"
-  runtime       = "python3.9"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  # This now points to a file we expect the CI/CD workflow to create.
+  filename         = "${path.module}/add_to_group.zip"
+  function_name    = "${var.project_name}-${var.environment}-post-confirmation-trigger"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "add_to_group.handler"
+  runtime          = "python3.9"
+  # This hash is now calculated directly from the .py file, so Terraform
+  # will correctly detect when your Lambda code changes.
+  source_code_hash = filebase64sha256("${path.module}/add_to_group.py")
 
   environment {
     variables = {
-      # CORRECTED: Use a static string for the group name to break the dependency cycle.
       FREE_TIER_GROUP_NAME = "free-tier"
     }
   }
@@ -93,7 +91,6 @@ resource "aws_lambda_function" "post_confirmation_trigger" {
 resource "aws_lambda_permission" "allow_cognito" {
   statement_id  = "AllowCognitoInvoke"
   action        = "lambda:InvokeFunction"
-  # CORRECTED: The attribute is 'function_name', not 'name'.
   function_name = aws_lambda_function.post_confirmation_trigger.function_name
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = aws_cognito_user_pool.this.arn
