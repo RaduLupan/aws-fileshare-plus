@@ -59,6 +59,7 @@ resource "aws_iam_policy" "flask_app_s3_access" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid = "AllowS3Access",
         Effect = "Allow"
         Action = [
           "s3:PutObject",
@@ -70,7 +71,16 @@ resource "aws_iam_policy" "flask_app_s3_access" {
           aws_s3_bucket.uploads_backend.arn,
           "${aws_s3_bucket.uploads_backend.arn}/*"
         ]
-      }
+      },
+      {
+        Sid: "AllowCognitoGroupManagement",
+        Effect: "Allow",
+        Action: [
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminRemoveUserFromGroup"
+      ],
+        Resource: "arn:aws:cognito-idp:us-east-2:481509955802:userpool/*"
+    }
     ]
   })
 

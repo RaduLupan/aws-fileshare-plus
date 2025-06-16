@@ -77,6 +77,13 @@ module "backend_app" {
   log_retention_in_days         = 30
 }
 
+module "cognito" {
+  source = "../../modules/cognito-user-management"
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+
 # Output relevant values from the modules
 output "frontend_cloudfront_url" {
   description = "The URL of the deployed frontend application."
