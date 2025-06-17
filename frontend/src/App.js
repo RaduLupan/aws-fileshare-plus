@@ -76,7 +76,8 @@ const SignInForm = ({ setAuthState, setUser, error, setError }) => {
     e.preventDefault();
     setError('');
     try {
-      const { isSignedIn, nextStep } = await signIn({ username: email, password });
+      // CORRECTED: Removed unused 'nextStep' variable
+      const { isSignedIn } = await signIn({ username: email, password });
       if (isSignedIn) {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
@@ -114,7 +115,8 @@ const SignUpForm = ({ setAuthState, error, setError }) => {
     e.preventDefault();
     setError('');
     try {
-      const { isSignUpComplete, userId, nextStep } = await signUp({
+      // CORRECTED: Removed unused 'isSignUpComplete' and 'userId' variables
+      const { nextStep } = await signUp({
         username: email,
         password,
         options: { userAttributes: { email } }
@@ -161,7 +163,8 @@ const ConfirmSignUpForm = ({ setAuthState }) => {
       return;
     }
     try {
-      const { isSignUpComplete, nextStep } = await confirmSignUp({ username, confirmationCode: code });
+      // CORRECTED: Removed unused 'nextStep' variable
+      const { isSignUpComplete } = await confirmSignUp({ username, confirmationCode: code });
       if (isSignUpComplete) {
         sessionStorage.removeItem('tempUsername');
         setAuthState('signIn');
@@ -276,4 +279,3 @@ const AppContent = ({ user, signOut }) => {
     </div>
   );
 };
-// --- End of App Component ---
