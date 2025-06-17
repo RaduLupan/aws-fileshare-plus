@@ -77,6 +77,14 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
+      # This new step prints the contents of the app.py file from the runner's
+      # filesystem, proving that the correct code was checked out before building.
+      - name: Verify Backend Code on Runner
+        run: |
+          echo "--- Verifying contents of backend/app.py on the runner ---"
+          cat backend/app.py
+          echo "--- End of file verification ---"
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -89,7 +97,8 @@ jobs:
           BRANCH_TAG: ${{ github.event.inputs.branch }}
         run: |
           cd backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG .
+          # The --no-cache flag forces a completely fresh build, ignoring stale layers.
+          docker build --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$BRANCH_TAG
           echo "Pushing tag: $COMMIT_SHA_TAG"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$COMMIT_SHA_TAG
@@ -102,4 +111,3 @@ jobs:
           echo "Using Cluster: ${{ env.ECS_CLUSTER_NAME }}"
           echo "Updating Service: ${{ env.ECS_SERVICE_NAME }}"
           aws ecs update-service --cluster "${{ env.ECS_CLUSTER_NAME }}" --service "${{ env.ECS_SERVICE_NAME }}" --force-new-deployment
-
