@@ -6,9 +6,9 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { withAuthenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
-// --- UPDATED: Correct configuration structure for modern Amplify ---
-// The configuration now has a nested "Cognito" object inside "Auth".
-Amplify.configure({
+
+// --- UPDATED: Debugging and Configuration ---
+const amplifyConfig = {
   Auth: {
     Cognito: {
       region: process.env.REACT_APP_AWS_REGION,
@@ -16,7 +16,13 @@ Amplify.configure({
       userPoolWebClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,
     }
   }
-});
+};
+
+// Log the configuration to the console for debugging purposes.
+// This will show up in your browser's Developer Tools console (F12).
+console.log("Attempting to configure Amplify with:", amplifyConfig.Auth.Cognito);
+
+Amplify.configure(amplifyConfig);
 
 // The `signOut` and `user` props are automatically passed in by withAuthenticator
 function App({ signOut, user }) {
@@ -175,5 +181,8 @@ function App({ signOut, user }) {
   );
 }
 
-// --- Export the App component wrapped in the Authenticator ---
-export default withAuthenticator(App);
+// --- UPDATED: Export the App component wrapped in the Authenticator ---
+// This customization makes the UI explicitly ask for an "Email" address.
+export default withAuthenticator(App, {
+  loginMechanisms: ['email'],
+});
