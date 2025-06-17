@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 
-// --- UPDATED: Imports for the Authenticator Component pattern ---
 import { Amplify } from 'aws-amplify';
 import { fetchAuthSession } from 'aws-amplify/auth';
-// Import the Authenticator component itself, not the withAuthenticator HOC
 import { Authenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
-// --- Configuration is moved back to App.js for focused debugging ---
+
+// --- FOR DEBUGGING ONLY: Hardcoding configuration values ---
+// This bypasses the entire process.env system to isolate the problem.
 const amplifyConfig = {
   Auth: {
     Cognito: {
-      region: process.env.REACT_APP_AWS_REGION,
-      userPoolId: process.env.REACT_APP_USER_POOL_ID,
-      userPoolWebClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,
+      // Replace these placeholder strings with your actual values
+      region: "us-east-2",
+      userPoolId: "us-east-2_1R3fvhChs",
+      userPoolWebClientId: "6kbrftjpkm3t7l5hcnv7c0vpaa",
     }
   }
 };
 
-// Log the configuration to the console to verify it's being read
-console.log("Configuring Amplify in App.js with:", amplifyConfig.Auth.Cognito);
+console.log("HARDCODED CONFIG: Configuring Amplify with:", amplifyConfig.Auth.Cognito);
 Amplify.configure(amplifyConfig);
 
 
@@ -84,6 +84,7 @@ const AppContent = ({ user, signOut }) => {
     formData.append('file', file);
 
     try {
+      // NOTE: We still use process.env for the API URL, as that part is working.
       const apiUrl = process.env.REACT_APP_CLOUDFRONT_CUSTOM_DOMAIN_URL;
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
@@ -164,11 +165,10 @@ const AppContent = ({ user, signOut }) => {
 };
 
 
-// --- The main App component is now a wrapper that uses the Authenticator component ---
+// The main App component is now a wrapper that uses the Authenticator component
 export default function App() {
   return (
     // The Authenticator component provides the entire UI flow.
-    // We also explicitly set the login mechanism to 'email'.
     <Authenticator loginMechanisms={['email']}>
       {/* This is a "render prop". Once the user is signed in, */}
       {/* this function is called with the `signOut` function and `user` object. */}
