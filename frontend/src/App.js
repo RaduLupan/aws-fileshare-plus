@@ -1,26 +1,41 @@
 import React, { useState, useEffect } from 'react';
 
-// --- Imports for modern AWS Amplify ---
-// NOTE: Amplify configuration has been moved to index.js
+// --- UPDATED: Imports for the Authenticator Component pattern ---
+import { Amplify } from 'aws-amplify';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { withAuthenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
+// Import the Authenticator component itself, not the withAuthenticator HOC
+import { Authenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
-// The `signOut` and `user` props are automatically passed in by withAuthenticator
-function App({ signOut, user }) {
+// --- Configuration is moved back to App.js for focused debugging ---
+const amplifyConfig = {
+  Auth: {
+    Cognito: {
+      region: process.env.REACT_APP_AWS_REGION,
+      userPoolId: process.env.REACT_APP_USER_POOL_ID,
+      userPoolWebClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,
+    }
+  }
+};
+
+// Log the configuration to the console to verify it's being read
+console.log("Configuring Amplify in App.js with:", amplifyConfig.Auth.Cognito);
+Amplify.configure(amplifyConfig);
+
+
+// This is the inner component that will be rendered ONLY after a successful login.
+const AppContent = ({ user, signOut }) => {
   const [file, setFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [tier, setTier] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- Function to get the user's tier from their JWT ---
+  // Function to get the user's tier from their JWT
   useEffect(() => {
     const getUserTier = async () => {
         try {
-            // Use the new fetchAuthSession function to get the current session details
             const { tokens } = await fetchAuthSession();
-            // The groups are in the 'cognito:groups' claim of the access token's payload
             const userGroups = tokens?.accessToken.payload['cognito:groups'] || [];
             if (userGroups.includes('premium-tier')) {
                 setTier('Premium');
@@ -29,11 +44,11 @@ function App({ signOut, user }) {
             }
         } catch (err) {
             console.log('Error fetching user session:', err);
-            setTier('Free'); // Default to Free tier if there's an error
+            setTier('Free');
         }
     };
     getUserTier();
-  }, [user]); // Rerun this effect if the user object changes
+  }, [user]);
 
   const onFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -41,15 +56,12 @@ function App({ signOut, user }) {
     setDownloadUrl('');
   };
 
-  // --- Using the modern fetchAuthSession function ---
   const getJwtToken = async () => {
     try {
       const { tokens } = await fetchAuthSession();
-      // The accessToken object has a toString() method which returns the JWT string
       return tokens?.accessToken.toString();
     } catch (error) {
       console.error("Error getting JWT token", error);
-      // It's good practice to sign the user out if their session is invalid
       signOut();
       return null;
     }
@@ -73,28 +85,21 @@ function App({ signOut, user }) {
 
     try {
       const apiUrl = process.env.REACT_APP_CLOUDFRONT_CUSTOM_DOMAIN_URL;
-      
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}` // Add the Authorization header
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
-
       const uploadData = await uploadResponse.json();
       if (!uploadResponse.ok) throw new Error(uploadData.message || 'Upload failed');
-
       setUploadMessage('Upload successful! Generating download link...');
       
       const fileName = uploadData.file_name;
       const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${fileName}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       const downloadData = await downloadResponse.json();
       if (!downloadResponse.ok) throw new Error(downloadData.message || 'Could not get download link');
-
       setDownloadUrl(downloadData.download_url);
       setUploadMessage(`Success! Link for ${tier} tier users (expires in ${Math.round(downloadData.expires_in_seconds / 86400)} days):`);
 
@@ -106,7 +111,6 @@ function App({ signOut, user }) {
     }
   };
 
-  // --- Function to handle the tier upgrade ---
   const handleUpgrade = async () => {
     setUploadMessage('Upgrading...');
     const token = await getJwtToken();
@@ -121,13 +125,9 @@ function App({ signOut, user }) {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upgrade failed');
-
       setUploadMessage('Upgrade successful! Please sign out and sign back in to see the change.');
-      // NOTE: For the new tier to reflect in the token, the user must get a new session.
-      
     } catch (error) {
       console.error('An error occurred during upgrade:', error);
       setUploadMessage(`Error: ${error.message}`);
@@ -161,7 +161,20 @@ function App({ signOut, user }) {
       </Card>
     </Flex>
   );
-}
+};
 
-// --- UPDATED: This no longer needs the custom loginMechanisms here ---
-export default withAuthenticator(App);
+
+// --- The main App component is now a wrapper that uses the Authenticator component ---
+export default function App() {
+  return (
+    // The Authenticator component provides the entire UI flow.
+    // We also explicitly set the login mechanism to 'email'.
+    <Authenticator loginMechanisms={['email']}>
+      {/* This is a "render prop". Once the user is signed in, */}
+      {/* this function is called with the `signOut` function and `user` object. */}
+      {({ signOut, user }) => (
+        <AppContent signOut={signOut} user={user} />
+      )}
+    </Authenticator>
+  );
+}
