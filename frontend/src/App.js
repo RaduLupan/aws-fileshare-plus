@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 
-// --- UPDATED: Correct imports for modern AWS Amplify ---
+// --- Imports for modern AWS Amplify ---
 import { Amplify } from 'aws-amplify';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { withAuthenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
-// --- Configure Amplify ---
-// This reads the configuration from environment variables that will be
-// injected by your deploy-frontend.yml workflow.
+// --- UPDATED: Correct configuration structure for modern Amplify ---
+// The configuration now has a nested "Cognito" object inside "Auth".
 Amplify.configure({
   Auth: {
-    region: process.env.REACT_APP_AWS_REGION,
-    userPoolId: process.env.REACT_APP_USER_POOL_ID,
-    userPoolWebClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,
-  },
+    Cognito: {
+      region: process.env.REACT_APP_AWS_REGION,
+      userPoolId: process.env.REACT_APP_USER_POOL_ID,
+      userPoolWebClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID,
+    }
+  }
 });
 
 // The `signOut` and `user` props are automatically passed in by withAuthenticator
@@ -25,7 +26,7 @@ function App({ signOut, user }) {
   const [tier, setTier] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- UPDATED: Function to get the user's tier from the current session ---
+  // --- Function to get the user's tier from their JWT ---
   useEffect(() => {
     const getUserTier = async () => {
         try {
@@ -52,7 +53,7 @@ function App({ signOut, user }) {
     setDownloadUrl('');
   };
 
-  // --- UPDATED: Using the modern fetchAuthSession function ---
+  // --- Using the modern fetchAuthSession function ---
   const getJwtToken = async () => {
     try {
       const { tokens } = await fetchAuthSession();
@@ -117,7 +118,7 @@ function App({ signOut, user }) {
     }
   };
 
-  // --- NEW: Function to handle the tier upgrade ---
+  // --- Function to handle the tier upgrade ---
   const handleUpgrade = async () => {
     setUploadMessage('Upgrading...');
     const token = await getJwtToken();
