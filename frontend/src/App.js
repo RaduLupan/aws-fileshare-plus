@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
-// --- NEW: Import Amplify and the pre-built UI components ---
-import { Amplify, Auth } from 'aws-amplify';
+// --- UPDATED: Correct imports for modern AWS Amplify ---
+import { Amplify } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { withAuthenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
-// --- NEW: Configure Amplify ---
+// --- Configure Amplify ---
 // This reads the configuration from environment variables that will be
 // injected by your deploy-frontend.yml workflow.
-// Note the names match the SSM parameter names, converted to uppercase.
 Amplify.configure({
   Auth: {
     region: process.env.REACT_APP_AWS_REGION,
@@ -25,21 +25,26 @@ function App({ signOut, user }) {
   const [tier, setTier] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- NEW: Function to get the user's tier from their JWT ---
-  const getUserTier = () => {
-    // The user's groups are in the access token payload
-    const userGroups = user.signInUserSession.accessToken.payload['cognito:groups'];
-    if (userGroups && userGroups.includes('premium-tier')) {
-      setTier('Premium');
-    } else {
-      setTier('Free');
-    }
-  };
-
-  // Run once when the component loads to set the initial tier
+  // --- UPDATED: Function to get the user's tier from the current session ---
   useEffect(() => {
+    const getUserTier = async () => {
+        try {
+            // Use the new fetchAuthSession function to get the current session details
+            const { tokens } = await fetchAuthSession();
+            // The groups are in the 'cognito:groups' claim of the access token's payload
+            const userGroups = tokens?.accessToken.payload['cognito:groups'] || [];
+            if (userGroups.includes('premium-tier')) {
+                setTier('Premium');
+            } else {
+                setTier('Free');
+            }
+        } catch (err) {
+            console.log('Error fetching user session:', err);
+            setTier('Free'); // Default to Free tier if there's an error
+        }
+    };
     getUserTier();
-  }, [user]);
+  }, [user]); // Rerun this effect if the user object changes
 
   const onFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -47,11 +52,12 @@ function App({ signOut, user }) {
     setDownloadUrl('');
   };
 
-  // --- UPDATED: All API calls now get the JWT first ---
+  // --- UPDATED: Using the modern fetchAuthSession function ---
   const getJwtToken = async () => {
     try {
-      const session = await Auth.currentSession();
-      return session.getAccessToken().getJwtToken();
+      const { tokens } = await fetchAuthSession();
+      // The accessToken object has a toString() method which returns the JWT string
+      return tokens?.accessToken.toString();
     } catch (error) {
       console.error("Error getting JWT token", error);
       // It's good practice to sign the user out if their session is invalid
@@ -77,7 +83,6 @@ function App({ signOut, user }) {
     formData.append('file', file);
 
     try {
-      // The API URL is injected during the build process
       const apiUrl = process.env.REACT_APP_CLOUDFRONT_CUSTOM_DOMAIN_URL;
       
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
@@ -169,6 +174,5 @@ function App({ signOut, user }) {
   );
 }
 
-// --- NEW: Export the App component wrapped in the Authenticator ---
-// This handles all the UI for sign-in, sign-up, etc. automatically.
+// --- Export the App component wrapped in the Authenticator ---
 export default withAuthenticator(App);
