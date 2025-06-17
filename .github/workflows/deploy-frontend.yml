@@ -86,12 +86,13 @@ jobs:
         run: |
           cd frontend
           npm ci
-          # This now uses the correct URL for API calls
           npm run build
         env:
-          # This variable now gets its value from the 'cloudfront_custom_domain_url'
-          # parameter that you created in SSM.
-          REACT_APP_BACKEND_API_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
+          # These values now all come dynamically from SSM and are passed to the React build process
+          REACT_APP_AWS_REGION: ${{ env.AWS_REGION }}
+          REACT_APP_USER_POOL_ID: ${{ env.USER_POOL_ID }}
+          REACT_APP_USER_POOL_CLIENT_ID: ${{ env.USER_POOL_CLIENT_ID }}
+          REACT_APP_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
 
       - name: Deploy static site to S3
         run: |
