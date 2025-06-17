@@ -85,7 +85,7 @@ jobs:
       - name: Install dependencies and build
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
         env:
           # These values now all come dynamically from SSM and are passed to the React build process
