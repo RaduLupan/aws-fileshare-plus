@@ -81,24 +81,28 @@ jobs:
         with:
           node-version: '20'
 
-      # --- THIS STEP HAS BEEN CORRECTED ---
+      # --- THIS STEP HAS BEEN CORRECTED for Vite---
       - name: Install dependencies and build
         run: |
           cd frontend
           npm install
-          npm run build
+          # Vite uses 'vite build' instead of 'npm run build' from scripts
+          npx vite build
         env:
           # These values now all come dynamically from SSM and are passed to the React build process
-          REACT_APP_AWS_REGION: ${{ env.AWS_REGION }}
-          REACT_APP_USER_POOL_ID: ${{ env.USER_POOL_ID }}
-          REACT_APP_USER_POOL_CLIENT_ID: ${{ env.USER_POOL_CLIENT_ID }}
-          REACT_APP_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
+          # Vite automatically loads env vars prefixed with VITE_
+          VITE_AWS_REGION: ${{ env.AWS_REGION }}
+          VITE_USER_POOL_ID: ${{ env.USER_POOL_ID }}
+          VITE_USER_POOL_CLIENT_ID: ${{ env.USER_POOL_CLIENT_ID }}
+          VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
 
       - name: Deploy static site to S3
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          aws s3 sync ./frontend/build s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
+          # Vite outputs to 'dist' folder by default, not 'build'
+          aws s3 sync ./frontend/dist s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+
