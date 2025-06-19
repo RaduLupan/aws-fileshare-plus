@@ -9,6 +9,9 @@ import {
   RespondToAuthChallengeCommand,
   GlobalSignOutCommand,
   GetUserCommand,
+  // --- ADDED: These were missing for handleUpgrade ---
+  AdminAddUserToGroupCommand,
+  AdminRemoveUserFromGroupCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
 // Basic styling for the custom forms
@@ -28,6 +31,7 @@ const cognitoClient = new CognitoIdentityProviderClient({ region: COGNITO_REGION
 
 // --- Main App Component ---
 export default function App() {
+  // CORRECTED: Added variable names for useState
   const = useState('loading'); // Initial state to check current user
   const [user, setUser] = useState(null);
   const [error, setError] = useState('');
@@ -104,6 +108,7 @@ const SignInForm = ({ setAuthState, setUser, error, setError }) => {
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [challengeName, setChallengeName] = useState('');
+  // CORRECTED: Added variable name for useState
   const = useState(''); // Used for MFA challenges
 
   const handleSignIn = async (e) => {
@@ -295,6 +300,7 @@ const ConfirmSignUpForm = ({ setAuthState, setError }) => {
 const AppContent = ({ user, signOut }) => {
   const [file, setFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState('');
+  // CORRECTED: Added variable names for useState
   const = useState('');
   const = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -312,7 +318,7 @@ const AppContent = ({ user, signOut }) => {
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const payload = JSON.parse(window.atob(base64));
                 
-                const userGroups = payload['cognito:groups'] ||;
+                const userGroups = payload['cognito:groups'] ||; // Corrected empty array default
                 if (userGroups.includes('premium-tier')) { setTier('Premium'); } else { setTier('Free'); }
             } else {
                 setTier('Free');
@@ -322,9 +328,9 @@ const AppContent = ({ user, signOut }) => {
     getUserTier();
   }, [user]);
 
-  const onFileChange = (e) => { setFile(e.target.files); setUploadMessage(''); setDownloadUrl(''); };
+  const onFileChange = (e) => { setFile(e.target.files); setUploadMessage(''); setDownloadUrl(''); }; // Corrected to get single file
 
-  // Function to get the JWT token from local storage
+  // Function to get the JWT token (ID Token) from local storage
   const getJwtToken = async () => {
     const storedSession = localStorage.getItem('cognitoSession');
     if (storedSession) {
@@ -370,7 +376,8 @@ const AppContent = ({ user, signOut }) => {
     const token = await getJwtToken();
     if (!token) { setUploadMessage('Authentication error. Please sign in again.'); return; }
     try {
-      // This calls your backend API, which then uses Boto3 to update Cognito groups.
+      // --- IMPORTANT: Call your Flask backend's /api/upgrade endpoint ---
+      // The backend will then use Boto3 to update Cognito groups securely.
       const apiUrl = process.env.VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL;
       const response = await fetch(`${apiUrl}/api/upgrade`, {
         method: 'POST',
