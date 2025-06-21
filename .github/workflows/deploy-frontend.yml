@@ -38,12 +38,15 @@ jobs:  deploy:
       - name: Fetch Configuration from SSM Parameter Store
         run: |
           echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
-          PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json)
-          if [ -z "$PARAMS_JSON" ]; then
+          PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters" --output json)
+          if [ -z "$PARAMS_JSON" ] || [ "$PARAMS_JSON" == "[]" ]; then
             echo "No parameters found at the specified path."; exit 1;
           fi
-          echo "$PARAMS_JSON" | jq -c '.' | while read -r line; do
-            PARAM_NAME=$(echo "$line" | jq -r '.Name'); PARAM_VALUE=$(echo "$line" | jq -r '.Value')
+          
+          echo "Parameters found, processing them..."
+          echo "$PARAMS_JSON" | jq -c '.[]' | while read -r param; do
+            PARAM_NAME=$(echo "$param" | jq -r '.Name')
+            PARAM_VALUE=$(echo "$param" | jq -r '.Value')
             VAR_NAME_LOWER=$(basename "$PARAM_NAME")
             VAR_NAME_UPPER=$(echo "$VAR_NAME_LOWER" | tr '[:lower:]' '[:upper:]')
             echo "Exporting: ${VAR_NAME_UPPER}=${PARAM_VALUE}"

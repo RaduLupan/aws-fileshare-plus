@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 
-import { fetchAuthSession } from 'aws-amplify/auth';
+// Import necessary Amplify v6 components and utilities
+import { fetchAuthSession, signOut as amplifySignOut } from 'aws-amplify/auth';
 import { Authenticator, Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
 // Import the configuration from the separate module
 import { configureAmplify } from './amplifyConfig.js';
 
-// Configure Amplify
+// Configure Amplify - must be done before any Amplify functions are called
 configureAmplify();
 
 
 // This is the inner component that will be rendered ONLY after a successful login.
-const AppContent = ({ user, signOut }) => {  const [file, setFile] = useState(null);
+const AppContent = ({ user, signOut }) => {
+  const [file, setFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [tier, setTier] = useState('Free');
@@ -151,14 +153,41 @@ const AppContent = ({ user, signOut }) => {  const [file, setFile] = useState(nu
   );
 }
 
-// --- Reverted: The main App component is now a wrapper that uses the Authenticator component ---
+// The main App component uses the Authenticator component from Amplify UI React
 export default function App() {
+  const formFields = {
+    signIn: {
+      username: {
+        label: 'Email',
+        placeholder: 'Enter your email',
+      },
+    },
+    signUp: {
+      email: {
+        label: 'Email',
+        placeholder: 'Enter your email',
+        order: 1,
+      },
+      password: {
+        label: 'Password',
+        placeholder: 'Enter your password',
+        order: 2,
+      },
+      confirm_password: {
+        label: 'Confirm Password',
+        order: 3,
+      },
+    },
+  };
+
   return (
-    // The Authenticator component provides the entire UI flow.
-    // We also explicitly set the login mechanism to 'email'.
-    <Authenticator loginMechanisms={['email']}>
-      {/* This is a "render prop". Once the user is signed in, */}
-      {/* this function is called with the `signOut` function and `user` object. */}
+    // The Authenticator component provides the entire UI flow for authentication
+    <Authenticator
+      formFields={formFields}
+      initialState="signUp"
+      socialProviders={[]}
+      loginMechanisms={['email']}
+    >
       {({ signOut, user }) => (
         <AppContent signOut={signOut} user={user} />
       )}
