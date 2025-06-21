@@ -30,3 +30,9 @@ node_modules/
 
 # build directories
 build/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production

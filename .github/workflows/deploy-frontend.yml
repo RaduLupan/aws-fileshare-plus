@@ -25,23 +25,19 @@ permissions:
 jobs:
   deploy:
     name: Build and Deploy Frontend
-    runs-on: ubuntu-latest
-    env:
-      TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' |
-| 'dev' }}
+    runs-on: ubuntu-latest    env:
+      TARGET_ENV: ${{ github.event.inputs.branch == 'main' && 'prod' || 'dev' }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          mask-aws-account-id: 'false'
-
-      - name: Fetch Configuration from SSM Parameter Store
+          mask-aws-account-id: 'false'      - name: Fetch Configuration from SSM Parameter Store
         run: |
           echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
           PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters[*]" --output json)
-          if ||" ]; then
+          if [ -z "$PARAMS_JSON" ]; then
             echo "No parameters found at the specified path."; exit 1;
           fi
           echo "$PARAMS_JSON" | jq -c '.' | while read -r line; do
@@ -72,12 +68,10 @@ jobs:
           VITE_AWS_REGION: ${{ env.AWS_REGION }}
           VITE_USER_POOL_ID: ${{ env.USER_POOL_ID }}
           VITE_USER_POOL_CLIENT_ID: ${{ env.USER_POOL_CLIENT_ID }}
-          VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
-
-      - name: Deploy static site to S3
+          VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}      - name: Deploy static site to S3
         run: |
           echo "Deploying to the ${{ env.TARGET_ENV }} environment..."
-          aws s3 sync./frontend/dist s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
+          aws s3 sync ./frontend/dist s3://${{ env.S3_REACT_BUCKET_NAME }} --delete
 
       - name: Invalidate CloudFront cache
         run: |
