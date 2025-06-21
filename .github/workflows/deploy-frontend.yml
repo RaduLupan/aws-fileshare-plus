@@ -33,9 +33,9 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-          mask-aws-account-id: 'false'
-            - name: Fetch Configuration from SSM Parameter Store
+          aws-region: ${{ env.AWS_REGION }}          mask-aws-account-id: 'false'
+          
+      - name: Fetch Configuration from SSM Parameter Store
         run: |
           echo "Fetching config for ${{ env.TARGET_ENV }} from path /fileshare/${{ env.TARGET_ENV }}"
           PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/${{ env.TARGET_ENV }}" --query "Parameters" --output json)
