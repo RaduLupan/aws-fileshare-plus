@@ -1,5 +1,3 @@
-# .github/workflows/deploy-infra.yml
-
 name: Manually Deploy Infrastructure
 
 on:
