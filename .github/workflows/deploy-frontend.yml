@@ -3,6 +3,7 @@
 name: Manually Deploy Frontend
 
 on:
+  # Only trigger this workflow manually through the GitHub UI
   workflow_dispatch:
     inputs:
       branch:
@@ -62,9 +63,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install dependencies and build
+          node-version: '20'      - name: Install dependencies and build
         run: |
           cd frontend
           npm install
