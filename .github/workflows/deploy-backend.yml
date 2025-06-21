@@ -1,5 +1,3 @@
-# .github/workflows/deploy-backend.yml
-
 name: Manually Deploy Backend
 
 on:
