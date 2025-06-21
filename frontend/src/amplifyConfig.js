@@ -1,5 +1,6 @@
 // amplifyConfig.js
 import { Amplify } from 'aws-amplify';
+import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 
 export const configureAmplify = () => {
   // Extract environment variables
@@ -16,15 +17,20 @@ export const configureAmplify = () => {
     });
   }
   
-  // Configuration for AWS Amplify
+  // Configuration for AWS Amplify v6
   const amplifyConfig = {
     Auth: {
       Cognito: {
-        region,
         userPoolId,
-        userPoolWebClientId,
+        userPoolClientId: userPoolWebClientId,
+        loginWith: {
+          email: true
+        }
       }
-    }
+    },
+    // Required to properly set region
+    aws_project_region: region,
+    aws_cognito_region: region
   };
   
   // Log configuration for debugging
