@@ -3,7 +3,6 @@ name: Manually Deploy Infrastructure
 on:
   workflow_dispatch:
     inputs:
-      # This dropdown lets you choose which environment to target
       environment:
         description: 'Environment to deploy'
         required: true
@@ -22,17 +21,14 @@ permissions:
   contents: read
 
 jobs:
-  # This job generates the Terraform plan
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest    env:
-      # Set the TF_ENV from the manual dropdown input
       TF_ENV: ${{ github.event.inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- NEW STEP ADDED ---
       - name: Create Lambda Deployment Package
         run: |
           cd terraform/modules/cognito-user-management
@@ -42,7 +38,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.5 # Specify the Terraform version you want to use
+          terraform_version: 1.10.5 
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -62,17 +58,15 @@ jobs:
           name: tfplan-${{ github.event.inputs.environment }}
           path: terraform/environments/${{ env.TF_ENV }}/tfplan
 
-  # This job applies the plan created above
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    needs: plan # This job only runs if the 'plan' job succeeds    env:
+    needs: plan 
       TF_ENV: ${{ github.event.inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- NEW STEP ADDED ---
       - name: Create Lambda Deployment Package
         run: |
           cd terraform/modules/cognito-user-management
@@ -82,7 +76,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.5 # Specify the Terraform version you want to use
+          terraform_version: 1.10.5 
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -102,7 +96,6 @@ jobs:
       - name: Terraform Apply
         run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} apply -auto-approve tfplan
 
-      # This step writes the Terraform outputs to AWS SSM Parameter Store
       - name: Write Terraform Outputs to SSM Parameter Store
         id: ssm-outputs
         run: |
