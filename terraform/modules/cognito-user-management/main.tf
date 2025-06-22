@@ -8,7 +8,8 @@ resource "aws_cognito_user_pool" "this" {
 
   # Configure users to sign in with email addresses
   alias_attributes = ["email"]
-  auto_verified_attributes = ["email"]
+  # Remove auto_verified_attributes to disable email verification requirement
+  # auto_verified_attributes = ["email"]
 
   password_policy {
     minimum_length    = 8
