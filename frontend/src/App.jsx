@@ -56,14 +56,18 @@ const CustomAuth = ({ onAuthenticated }) => {
         }
       });      console.log('SignUp successful:', result);
       
-      // With email verification disabled, signup should complete immediately
-      if (result.isSignUpComplete) {
-        console.log('Signup completed, attempting auto sign-in...');
+      // Check if auto sign-in worked
+      if (result.isSignUpComplete && result.nextStep?.signInStep === 'DONE') {
+        console.log('Auto sign-in successful!');
         onAuthenticated();
+      } else if (result.isSignUpComplete) {
+        console.log('Signup completed successfully! User can now sign in.');
+        setError('Account created successfully! Please sign in with your credentials.');
+        setIsSignUp(false); // Switch to sign-in mode
       } else {
-        // Fallback - try to sign in immediately
-        console.log('Signup completed but not auto-signed in, trying manual sign-in...');
-        await handleSignIn(e);
+        console.log('Signup requires additional steps:', result.nextStep);
+        setError('Account created! Please check the console for next steps.');
+        setIsSignUp(false);
       }
     } catch (error) {
       console.error('SignUp error:', error);

@@ -17,10 +17,11 @@ resource "aws_cognito_user_pool" "this" {
     require_numbers   = true
     require_symbols   = true
     require_uppercase = true
-  }
-
-  # Configure the Lambda function to trigger after a user confirms their account
+  }  # Configure Lambda triggers
   lambda_config {
+    # Pre-sign-up trigger to auto-confirm users in dev environment only
+    pre_sign_up = var.environment == "dev" ? aws_lambda_function.pre_signup_trigger[0].arn : null
+    # Post-confirmation trigger to add users to free tier group
     post_confirmation = aws_lambda_function.post_confirmation_trigger.arn
   }
 
@@ -60,10 +61,36 @@ resource "aws_cognito_user_group" "premium_tier" {
 }
 
 # -----------------------------------------------------------------------------
-# Lambda Trigger to Add New Users to the Free Tier
+# Lambda Triggers
 # -----------------------------------------------------------------------------
 
-# NOTE: The data "archive_file" block has been removed.
+# Lambda function for pre-sign-up trigger (auto-confirm users in dev)
+resource "aws_lambda_function" "pre_signup_trigger" {
+  count            = var.environment == "dev" ? 1 : 0
+  filename         = "${path.module}/auto_confirm_user.zip"
+  function_name    = "${var.project_name}-${var.environment}-pre-signup-trigger"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "auto_confirm_user.handler"
+  runtime          = "python3.13"
+  source_code_hash = filebase64sha256("${path.module}/auto_confirm_user.py")
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# Allow Cognito service to invoke the pre-sign-up Lambda function
+resource "aws_lambda_permission" "allow_cognito_pre_signup" {
+  count         = var.environment == "dev" ? 1 : 0
+  statement_id  = "AllowCognitoInvokePreSignup"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.pre_signup_trigger[0].function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = aws_cognito_user_pool.this.arn
+}
+
+# Lambda function for post-confirmation trigger (add users to groups)
 
 resource "aws_lambda_function" "post_confirmation_trigger" {
   # This now points to a file we expect the CI/CD workflow to create.
