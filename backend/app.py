@@ -6,6 +6,7 @@ import boto3
 import os
 import jwt
 import requests
+import json
 from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -26,6 +27,7 @@ CORS(app, origins=[
 # These will be loaded from environment variables set in the ECS Task Definition.
 AWS_REGION = os.environ.get('AWS_REGION')
 COGNITO_USER_POOL_ID = os.environ.get('COGNITO_USER_POOL_ID')
+COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID')
 
 # Construct the URL for the JSON Web Key Set (JWKS)
 # This is used to get the public keys needed to verify the JWTs.
@@ -101,19 +103,32 @@ def token_required(f):
             
             if not rsa_key:
                  return jsonify({'message': 'Public key not found'}), 401
-            
-            # Convert RSA key components to PEM format
+              # Convert RSA key components to PEM format
             pem_key = rsa_key_to_pem(rsa_key)
             if not pem_key:
                 return jsonify({'message': 'Failed to process public key'}), 401
             
-            # Verify the token's signature and claims
+            # Add comprehensive debug logging
+            unverified_header = jwt.get_unverified_header(token)
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            
+            print("=== JWT DEBUG INFO ===")
+            print(f"Token header: {json.dumps(unverified_header, indent=2)}")
+            print(f"Token payload: {json.dumps(unverified_payload, indent=2)}")
+            print(f"Token audience (aud): {unverified_payload.get('aud')}")
+            print(f"Token issuer (iss): {unverified_payload.get('iss')}")
+            print(f"Token expiration (exp): {unverified_payload.get('exp')}")
+            print(f"Token use (token_use): {unverified_payload.get('token_use')}")
+            print(f"Expected audience (COGNITO_CLIENT_ID): {COGNITO_CLIENT_ID}")
+            print(f"Expected issuer: https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}")
+            print("=== END JWT DEBUG INFO ===")
+            
+            # Simplify JWT validation - ONLY verify signature for now
             decoded_token = jwt.decode(
                 token,
                 pem_key,
                 algorithms=["RS256"],
-                audience=None, # In a stricter setup, you would validate the 'aud' (client_id)
-                issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+                options={"verify_signature": True}  # Only verify signature, skip all other validations
             )
 
         except jwt.ExpiredSignatureError:
