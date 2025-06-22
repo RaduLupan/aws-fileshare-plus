@@ -100,7 +100,7 @@ output "s3_react_bucket_name" {
 
 output "backend_alb_url" {
   description = "The URL of the backend ALB."
-  value       = "https://${module.backend_app.alb_dns_name}" # Use http for now, update to https when ALB has certificate
+  value       = var.alb_enable_https_listener ? "https://${var.alb_custom_domain_name}" : "http://${module.backend_app.alb_dns_name}"
 }
 
 output "s3_uploads_bucket_name" {
