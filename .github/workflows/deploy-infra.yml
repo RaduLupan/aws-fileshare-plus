@@ -39,7 +39,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.5 
+          terraform_version: 1.10.5
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -51,7 +51,9 @@ jobs:
         run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} init
 
       - name: Terraform Plan
-        run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} plan -out=tfplan -var-file=${{ env.TF_ENV }}.tfvars      - name: Upload plan artifact
+        run: terraform -chdir=terraform/environments/${{ env.TF_ENV }} plan -out=tfplan -var-file=${{ env.TF_ENV }}.tfvars
+
+      - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ github.event.inputs.environment }}
@@ -76,7 +78,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.5 
+          terraform_version: 1.10.5
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -101,14 +103,10 @@ jobs:
         run: |
           echo "Writing Terraform outputs to SSM Parameter Store..."
           
-          # Change directory to where the state file is
           cd terraform/environments/${{ env.TF_ENV }}
 
-          # A more robust way to loop through the raw output names
           terraform output -json | jq -r 'keys_unsorted[]' | while read -r OUTPUT_NAME; do
-            # Get the value of the specific output, ensuring the name is quoted for the command
             VALUE=$(terraform output -raw "$OUTPUT_NAME")
-            # Construct the SSM parameter name hierarchically
             PARAM_NAME="/fileshare/${{ env.TF_ENV }}/${OUTPUT_NAME}"
             
             echo "Writing $PARAM_NAME with value: $VALUE"
