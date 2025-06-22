@@ -7,7 +7,7 @@ resource "aws_cognito_user_pool" "this" {
   name = "${var.project_name}-${var.environment}-user-pool"
 
   # Configure users to sign in with email addresses
-  alias_attributes = ["email"]
+  username_attributes = ["email"]
   # Remove auto_verified_attributes to disable email verification requirement
   # auto_verified_attributes = ["email"]
 
