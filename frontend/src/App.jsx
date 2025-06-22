@@ -255,10 +255,8 @@ const AppContent = ({ user, signOut }) => {
       setUploadMessage('Authentication error. Please sign in again.');
       setIsUploading(false);
       return;
-    }
-
-    try {
-      const apiUrl = import.meta.env.VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL;
+    }    try {
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
       const formData = new FormData();
       formData.append('file', file);
 
@@ -300,10 +298,8 @@ const AppContent = ({ user, signOut }) => {
     if (!token) {
       setUploadMessage('Authentication error. Please sign in again.');
       return;
-    }
-
-    try {
-      const apiUrl = import.meta.env.VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL;
+    }    try {
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
       const response = await fetch(`${apiUrl}/api/upgrade`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }

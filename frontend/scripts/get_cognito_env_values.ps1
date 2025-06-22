@@ -31,6 +31,7 @@ function Get-SSMParameter {
 $userPoolId = Get-SSMParameter -ParamName "user_pool_id"
 $userPoolClientId = Get-SSMParameter -ParamName "user_pool_client_id"
 $cloudfrontDomain = Get-SSMParameter -ParamName "cloudfront_custom_domain_url"
+$backendApiUrl = Get-SSMParameter -ParamName "backend_alb_url"
 
 if (!$userPoolId -or !$userPoolClientId) {
     Write-Error "Failed to retrieve required parameters from SSM"
@@ -44,6 +45,7 @@ VITE_USER_POOL_ID=$userPoolId
 VITE_USER_POOL_CLIENT_ID=$userPoolClientId
 VITE_AWS_REGION=$region
 VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL=$cloudfrontDomain
+VITE_BACKEND_API_URL=$backendApiUrl
 "@
 
 # Save the file
