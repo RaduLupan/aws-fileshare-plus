@@ -10,8 +10,14 @@ from functools import wraps
 
 app = Flask(__name__)
 
-# Note: For production, you should restrict the origins to your specific frontend domains.
-CORS(app) 
+# Configure CORS to allow localhost for development
+CORS(app, origins=[
+    "https://cf.aws.lupan.ca",           # Production frontend
+    "http://localhost:3000",             # Local development
+    "https://localhost:3000",            # Local development with HTTPS
+    "http://127.0.0.1:3000",            # Alternative localhost
+    "https://127.0.0.1:3000"            # Alternative localhost with HTTPS
+])
 
 # --- NEW: Cognito Configuration ---
 # These will be loaded from environment variables set in the ECS Task Definition.
