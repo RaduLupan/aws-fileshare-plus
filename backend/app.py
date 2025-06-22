@@ -7,6 +7,9 @@ import os
 import jwt
 import requests
 from functools import wraps
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+import base64
 
 app = Flask(__name__)
 
@@ -36,12 +39,39 @@ except requests.exceptions.RequestException as e:
     jwks = []
 
 
+def rsa_key_to_pem(rsa_key_dict):
+    """Convert RSA key components (n, e) to PEM format for PyJWT"""
+    try:
+        # Decode base64url encoded values
+        n = base64.urlsafe_b64decode(rsa_key_dict['n'] + '==')  # Add padding if needed
+        e = base64.urlsafe_b64decode(rsa_key_dict['e'] + '==')  # Add padding if needed
+        
+        # Convert bytes to integers
+        n_int = int.from_bytes(n, byteorder='big')
+        e_int = int.from_bytes(e, byteorder='big')
+        
+        # Create RSA public key
+        public_key = rsa.RSAPublicNumbers(e_int, n_int).public_key()
+        
+        # Serialize to PEM format
+        pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        
+        return pem.decode('utf-8')
+    except Exception as e:
+        print(f"Error converting RSA key to PEM: {e}")
+        return None
+
+
 # --- NEW: JWT Validation Decorator ---
 # A decorator is a clean, reusable way to protect Flask routes.
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
+        
         # Check for the 'Authorization' header
         if 'Authorization' in request.headers:
             # The header should be in the format "Bearer <token>"
@@ -49,10 +79,10 @@ def token_required(f):
                 token = request.headers['Authorization'].split(" ")[1]
             except IndexError:
                 return jsonify({'message': 'Bearer token malformed'}), 401
-
+        
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
-
+        
         try:
             # Get the unverified header from the token
             unverified_header = jwt.get_unverified_header(token)
@@ -72,10 +102,15 @@ def token_required(f):
             if not rsa_key:
                  return jsonify({'message': 'Public key not found'}), 401
             
+            # Convert RSA key components to PEM format
+            pem_key = rsa_key_to_pem(rsa_key)
+            if not pem_key:
+                return jsonify({'message': 'Failed to process public key'}), 401
+            
             # Verify the token's signature and claims
             decoded_token = jwt.decode(
                 token,
-                rsa_key,
+                pem_key,
                 algorithms=["RS256"],
                 audience=None, # In a stricter setup, you would validate the 'aud' (client_id)
                 issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
