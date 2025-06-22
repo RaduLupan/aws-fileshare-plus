@@ -38,15 +38,13 @@ const CustomAuth = ({ onAuthenticated }) => {
     }
     
     setIsLoading(true);
-    setError('');
-      try {
-      // Generate a unique username from email (remove @ and . and add timestamp)
-      const username = email.replace(/[@.]/g, '') + Date.now().toString().slice(-4);
-      console.log('Generated username:', username);
-      setGeneratedUsername(username);
+    setError('');      try {
+      // Use email directly as username since alias_attributes = ["email"] is enabled
+      console.log('Using email as username:', email);
+      setGeneratedUsername(email); // Store email as the "generated" username for consistency
       
       const result = await signUp({
-        username: username,
+        username: email, // Use email directly as username
         password: password,
         attributes: {
           email: email,
@@ -54,14 +52,14 @@ const CustomAuth = ({ onAuthenticated }) => {
         autoSignIn: {
           enabled: true,
         }
-      });      console.log('SignUp successful:', result);
+      });console.log('SignUp successful:', result);
       
       // Check if auto sign-in worked
       if (result.isSignUpComplete && result.nextStep?.signInStep === 'DONE') {
         console.log('Auto sign-in successful!');
         onAuthenticated();      } else if (result.isSignUpComplete) {
         console.log('Signup completed successfully! User can now sign in.');
-        setError(`Account created successfully! Username: ${username}. You can sign in with your email or this username.`);
+        setError(`Account created successfully! You can sign in with your email: ${email}`);
         setIsSignUp(false); // Switch to sign-in mode
       } else {
         console.log('Signup requires additional steps:', result.nextStep);
@@ -74,39 +72,19 @@ const CustomAuth = ({ onAuthenticated }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-  const handleSignIn = async (e) => {
+  };  const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     
     try {
-      // Try signing in with email first (alias), then fall back to generated username
-      let result;
-      let loginMethod = 'email';
+      // Sign in with email (which is now the username)
+      const result = await signIn({
+        username: email,
+        password: password,
+      });
       
-      try {
-        result = await signIn({
-          username: email,
-          password: password,
-        });
-        console.log('SignIn with email successful:', result);
-      } catch (emailError) {
-        console.log('Sign in with email failed, trying with generated username:', emailError.message);
-        
-        if (generatedUsername) {
-          loginMethod = 'username';
-          result = await signIn({
-            username: generatedUsername,
-            password: password,
-          });
-          console.log('SignIn with generated username successful:', result);
-        } else {
-          throw emailError;
-        }
-      }
-      
-      console.log(`SignIn successful using ${loginMethod}:`, result);
+      console.log('SignIn successful:', result);
       if (result.isSignedIn) {
         onAuthenticated();
       }
