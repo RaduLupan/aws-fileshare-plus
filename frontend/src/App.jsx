@@ -59,10 +59,9 @@ const CustomAuth = ({ onAuthenticated }) => {
       // Check if auto sign-in worked
       if (result.isSignUpComplete && result.nextStep?.signInStep === 'DONE') {
         console.log('Auto sign-in successful!');
-        onAuthenticated();
-      } else if (result.isSignUpComplete) {
+        onAuthenticated();      } else if (result.isSignUpComplete) {
         console.log('Signup completed successfully! User can now sign in.');
-        setError('Account created successfully! Please sign in with your credentials.');
+        setError(`Account created successfully! Username: ${username}. You can sign in with your email or this username.`);
         setIsSignUp(false); // Switch to sign-in mode
       } else {
         console.log('Signup requires additional steps:', result.nextStep);
@@ -76,19 +75,38 @@ const CustomAuth = ({ onAuthenticated }) => {
       setIsLoading(false);
     }
   };
-
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     
     try {
-      const result = await signIn({
-        username: email,
-        password: password,
-      });
+      // Try signing in with email first (alias), then fall back to generated username
+      let result;
+      let loginMethod = 'email';
       
-      console.log('SignIn successful:', result);
+      try {
+        result = await signIn({
+          username: email,
+          password: password,
+        });
+        console.log('SignIn with email successful:', result);
+      } catch (emailError) {
+        console.log('Sign in with email failed, trying with generated username:', emailError.message);
+        
+        if (generatedUsername) {
+          loginMethod = 'username';
+          result = await signIn({
+            username: generatedUsername,
+            password: password,
+          });
+          console.log('SignIn with generated username successful:', result);
+        } else {
+          throw emailError;
+        }
+      }
+      
+      console.log(`SignIn successful using ${loginMethod}:`, result);
       if (result.isSignedIn) {
         onAuthenticated();
       }
