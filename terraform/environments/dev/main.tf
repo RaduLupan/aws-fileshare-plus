@@ -75,9 +75,9 @@ module "backend_app" {
 
   s3_uploads_bucket_name_prefix = "${var.project_name}-${var.environment}-uploads"
   log_retention_in_days         = 30
-
   # Add this line to connect the modules:
   cognito_user_pool_id = module.cognito.user_pool_id
+  cognito_client_id    = module.cognito.user_pool_client_id
 }
 
 module "cognito" {

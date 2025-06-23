@@ -42,11 +42,14 @@ resource "aws_ecs_task_definition" "flask" {
       {
         name  = "AWS_REGION" # Also good to pass the region
         value = var.aws_region
-      },
-      # --- ADD THIS NEW BLOCK ---
+      },      # --- ADD THIS NEW BLOCK ---
       {
         name  = "COGNITO_USER_POOL_ID"
         value = var.cognito_user_pool_id # Use the new input variable
+      },
+      {
+        name  = "COGNITO_CLIENT_ID"
+        value = var.cognito_client_id # Use the new input variable
       }
     ]
     logConfiguration = {
