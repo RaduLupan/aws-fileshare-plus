@@ -59,6 +59,11 @@ variable "cognito_user_pool_id" {
   type        = string
 }
 
+variable "cognito_client_id" {
+  description = "The ID of the Cognito User Pool Client to be used by the backend."
+  type        = string
+}
+
 #---------------------------------------------------------------
 # OPTIONAL PARAMETERS: These parameters have resonable defaults.
 #---------------------------------------------------------------
