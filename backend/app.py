@@ -128,7 +128,12 @@ def token_required(f):
                 token,
                 pem_key,
                 algorithms=["RS256"],
-                options={"verify_signature": True}  # Only verify signature, skip all other validations
+                options={
+                    "verify_signature": True,
+                    "verify_aud": False,  # Explicitly disable audience validation
+                    "verify_iss": False,  # Explicitly disable issuer validation
+                    "verify_exp": False   # Explicitly disable expiration validation
+                }
             )
 
         except jwt.ExpiredSignatureError:
