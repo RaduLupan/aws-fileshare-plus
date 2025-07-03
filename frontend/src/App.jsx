@@ -249,29 +249,41 @@ const AppContent = ({ user, signOut }) => {
   };
 
   const onFileUpload = async () => {
-    if (!file) return;
+    console.log('=== FILE UPLOAD FUNCTION CALLED ===');
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
 
     setIsUploading(true);
     setUploadMessage('Uploading...');
     setDownloadUrl('');
 
+    console.log('Getting JWT token...');
     const token = await getJwtToken();
+    console.log('Token result:', token ? 'Token received' : 'No token received');
     if (!token) {
       setUploadMessage('Authentication error. Please sign in again.');
       setIsUploading(false);
       return;
     }    try {
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      console.log('API URL:', apiUrl);
+      console.log('Preparing FormData with file:', file.name);
+      
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log('Making upload request with token:', token.substring(0, 20) + '...');
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
+      console.log('Upload response status:', uploadResponse.status);
       const uploadData = await uploadResponse.json();
+      console.log('Upload response data:', uploadData);
       
       if (!uploadResponse.ok) throw new Error(uploadData.message || 'Upload failed');
 
