@@ -72,6 +72,7 @@ jobs:
           VITE_USER_POOL_ID: ${{ env.USER_POOL_ID }}
           VITE_USER_POOL_CLIENT_ID: ${{ env.USER_POOL_CLIENT_ID }}
           VITE_CLOUDFRONT_CUSTOM_DOMAIN_URL: ${{ env.CLOUDFRONT_CUSTOM_DOMAIN_URL }}
+          VITE_BACKEND_API_URL: ${{ env.BACKEND_ALB_URL }}
           
       - name: Deploy static site to S3
         run: |
