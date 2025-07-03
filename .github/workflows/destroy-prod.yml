@@ -1,0 +1,123 @@
+name: Destroy Production Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY PROD" to confirm destruction of production environment'
+        required: true
+        type: string
+      backup_data:
+        description: 'Have you backed up any important data?'
+        required: true
+        type: choice
+        default: 'No'
+        options:
+          - 'No'
+          - 'Yes'
+
+env:
+  AWS_REGION: "us-east-2"
+  IAM_ROLE_TO_ASSUME: "arn:aws:iam::481509955802:role/githubactions-radulupan-aws-fileshare-plus-role"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy-prod:
+    name: Destroy Production Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy == 'DESTROY PROD' && github.event.inputs.backup_data == 'Yes'
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Get Production Parameters
+        run: |
+          echo "Getting production environment parameters..."
+          PARAMS_JSON=$(aws ssm get-parameters-by-path --path "/fileshare/prod" --query "Parameters" --output json)
+          if [ -z "$PARAMS_JSON" ] || [ "$PARAMS_JSON" == "[]" ]; then
+            echo "No production parameters found - environment may already be destroyed"
+            exit 0
+          fi
+          
+          echo "Production parameters found, processing them..."
+          echo "$PARAMS_JSON" | jq -c '.[]' | while read -r param; do
+            PARAM_NAME=$(echo "$param" | jq -r '.Name')
+            PARAM_VALUE=$(echo "$param" | jq -r '.Value')
+            VAR_NAME_LOWER=$(basename "$PARAM_NAME")
+            VAR_NAME_UPPER=$(echo "$VAR_NAME_LOWER" | tr '[:lower:]' '[:upper:]')
+            echo "Setting: ${VAR_NAME_UPPER}=${PARAM_VALUE}"
+            echo "${VAR_NAME_UPPER}=${PARAM_VALUE}" >> $GITHUB_ENV
+          done
+
+      - name: Initialize Terraform for Production
+        run: |
+          cd terraform/environments/prod
+          terraform init
+
+      - name: Plan Destruction
+        run: |
+          cd terraform/environments/prod
+          echo "Planning destruction of production environment..."
+          terraform plan -destroy -var-file="prod.tfvars"
+
+      - name: Confirm and Destroy Production Environment
+        run: |
+          cd terraform/environments/prod
+          echo "🚨 DESTROYING PRODUCTION ENVIRONMENT 🚨"
+          echo "This will permanently delete all production infrastructure!"
+          terraform destroy -auto-approve -var-file="prod.tfvars"
+
+      - name: Clean up Production Parameters
+        run: |
+          echo "Cleaning up production environment parameters..."
+          aws ssm delete-parameters-by-path --path "/fileshare/prod" --recursive || echo "No parameters to delete"
+
+      - name: Summary
+        run: |
+          echo "✅ Production environment has been successfully destroyed"
+          echo "💰 This will save on AWS costs"
+          echo "🔄 You can recreate it later using the infrastructure deployment workflow"
+          echo ""
+          echo "Next steps:"
+          echo "1. Continue development in the dev environment"
+          echo "2. When ready for production, redeploy using GitHub Actions"
+
+  safety-check:
+    name: Safety Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy != 'DESTROY PROD' || github.event.inputs.backup_data != 'Yes'
+    
+    steps:
+      - name: Safety Check Failed
+        run: |
+          echo "❌ SAFETY CHECK FAILED"
+          echo ""
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY PROD" ]; then
+            echo "🔒 You must type exactly 'DESTROY PROD' to confirm destruction"
+          fi
+          if [ "${{ github.event.inputs.backup_data }}" != "Yes" ]; then
+            echo "💾 You must confirm that you have backed up any important data"
+          fi
+          echo ""
+          echo "Please ensure you:"
+          echo "1. Have backed up any important data from production"
+          echo "2. Type exactly 'DESTROY PROD' in the confirmation field"
+          echo "3. Select 'Yes' for the backup confirmation"
+          exit 1
