@@ -11,6 +11,7 @@ from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
+from urllib.parse import unquote
 
 app = Flask(__name__)
 
@@ -193,6 +194,11 @@ def get_download_link(decoded_token):
     if not file_name:
         return jsonify({'message': 'Missing file_name parameter'}), 400
     
+    # Decode URL-encoded file name
+    decoded_file_name = unquote(file_name)
+    print(f"Original file_name: {file_name}")
+    print(f"Decoded file_name: {decoded_file_name}")
+    
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
     
@@ -206,15 +212,17 @@ def get_download_link(decoded_token):
     try:
         url = s3.generate_presigned_url(
             'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': file_name},
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': decoded_file_name},
             ExpiresIn=expiration_seconds
         )
+        print(f"Generated presigned URL for S3 key: {decoded_file_name}")
         return jsonify({
             'download_url': url,
             'tier': tier,
             'expires_in_seconds': expiration_seconds
         })
     except Exception as e:
+        print(f"Error generating presigned URL for key '{decoded_file_name}': {e}")
         return jsonify({'message': f'Could not generate presigned URL: {e}'}), 500
 
 # --- NEW: Endpoint to handle tier upgrade ---
