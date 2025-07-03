@@ -292,12 +292,14 @@ const AppContent = ({ user, signOut }) => {
       const fileName = uploadData.file_name;
       console.log('File name from upload response:', fileName);
       
-      // URL encode the filename to handle special characters
-      const encodedFileName = encodeURIComponent(fileName);
-      console.log('Encoded file name:', encodedFileName);
-      
-      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodedFileName}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      // Use POST request to avoid URL query parameter limitations with special characters
+      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ file_name: fileName })
       });
       
       const downloadData = await downloadResponse.json();
