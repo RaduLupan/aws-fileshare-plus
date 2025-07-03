@@ -290,7 +290,13 @@ const AppContent = ({ user, signOut }) => {
       setUploadMessage('Upload successful! Generating download link...');
       
       const fileName = uploadData.file_name;
-      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${fileName}`, {
+      console.log('File name from upload response:', fileName);
+      
+      // URL encode the filename to handle special characters
+      const encodedFileName = encodeURIComponent(fileName);
+      console.log('Encoded file name:', encodedFileName);
+      
+      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodedFileName}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
