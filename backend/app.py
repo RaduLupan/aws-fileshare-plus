@@ -187,17 +187,29 @@ def upload_file(decoded_token): # The decoded token is passed by the decorator
     return jsonify({'message': 'S3 bucket not configured'}), 500
 
 # --- UPDATED: This endpoint is protected and has tiered logic ---
-@app.route("/api/get-download-link", methods=['GET'])
+@app.route("/api/get-download-link", methods=['GET', 'POST'])
 @token_required
 def get_download_link(decoded_token):
-    file_name = request.args.get('file_name')
+    # Handle both GET (with query param) and POST (with JSON body) requests
+    if request.method == 'POST':
+        data = request.get_json()
+        file_name = data.get('file_name') if data else None
+    else:
+        file_name = request.args.get('file_name')
+    
     if not file_name:
         return jsonify({'message': 'Missing file_name parameter'}), 400
     
-    # Decode URL-encoded file name
-    decoded_file_name = unquote(file_name)
+    # Decode URL-encoded file name only if it's from GET request
+    if request.method == 'GET':
+        decoded_file_name = unquote(file_name)
+    else:
+        decoded_file_name = file_name
+    
+    print(f"Request method: {request.method}")
     print(f"Original file_name: {file_name}")
     print(f"Decoded file_name: {decoded_file_name}")
+    print(f"File name length: {len(decoded_file_name)}")
     
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
