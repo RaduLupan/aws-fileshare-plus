@@ -229,8 +229,13 @@ const AppContent = ({ user, signOut }) => {
   // Function to get JWT token for backend requests
   const getJwtToken = async () => {
     try {
-      const { tokens } = await fetchAuthSession();
-      return tokens?.idToken?.toString();
+      console.log('=== GETTING JWT TOKEN ===');
+      const authSession = await fetchAuthSession();
+      console.log('Auth session:', authSession);
+      const token = authSession?.tokens?.idToken?.toString();
+      console.log('JWT token retrieved:', token ? 'Token found' : 'No token');
+      console.log('JWT token preview:', token ? token.substring(0, 50) + '...' : 'null');
+      return token;
     } catch (error) {
       console.error('Error getting JWT token:', error);
       return null;
