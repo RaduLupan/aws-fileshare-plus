@@ -135,6 +135,7 @@ const CustomAuth = ({ onAuthenticated }) => {
       
       console.log('Password reset code sent successfully');
       setShowResetCodeForm(true);
+      setResetCode(''); // Explicitly clear the reset code field
       setError(''); // Clear any previous errors
     } catch (error) {
       console.error('Reset password error:', error);
@@ -197,6 +198,10 @@ const CustomAuth = ({ onAuthenticated }) => {
                 onChange={(e) => setResetCode(e.target.value)}
                 required
                 placeholder="Enter the code from your email"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
                 style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
               />
             </div>
@@ -230,6 +235,9 @@ const CustomAuth = ({ onAuthenticated }) => {
             onClick={() => {
               setForgotPasswordMode(false);
               setShowResetCodeForm(false);
+              setResetCode(''); // Clear reset code
+              setNewPassword(''); // Clear password fields
+              setConfirmNewPassword('');
               setError('');
             }}
             style={{ width: '100%' }}
@@ -263,6 +271,10 @@ const CustomAuth = ({ onAuthenticated }) => {
             variation="link"
             onClick={() => {
               setForgotPasswordMode(false);
+              setShowResetCodeForm(false);
+              setResetCode(''); // Clear reset code
+              setNewPassword(''); // Clear password fields
+              setConfirmNewPassword('');
               setError('');
             }}
             style={{ width: '100%' }}
@@ -357,6 +369,10 @@ const CustomAuth = ({ onAuthenticated }) => {
           variation="link"
           onClick={() => {
             setForgotPasswordMode(true);
+            setResetCode(''); // Clear reset code when entering forgot password mode
+            setNewPassword(''); // Clear new password fields too
+            setConfirmNewPassword('');
+            setShowResetCodeForm(false); // Start with email form, not code form
             setError('');
           }}
           style={{ width: '100%', marginTop: '0.5rem' }}
