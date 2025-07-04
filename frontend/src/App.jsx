@@ -292,11 +292,8 @@ const AppContent = ({ user, signOut }) => {
       const fileName = uploadData.file_name;
       console.log('File name from upload response:', fileName);
       
-      // Base64 encode the filename to avoid URL parameter issues with special characters
-      const encodedFileName = btoa(fileName);
-      console.log('Base64 encoded file name:', encodedFileName);
-      
-      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodedFileName}`, {
+      // Simple approach: just pass the filename directly (already sanitized by backend)
+      const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodeURIComponent(fileName)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
