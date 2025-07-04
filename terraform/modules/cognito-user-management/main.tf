@@ -8,8 +8,23 @@ resource "aws_cognito_user_pool" "this" {
 
   # Configure users to sign in with email addresses
   username_attributes = ["email"]
-  # Remove auto_verified_attributes to disable email verification requirement
-  # auto_verified_attributes = ["email"]
+  # Enable email verification for password reset and account recovery
+  auto_verified_attributes = ["email"]
+  
+  # Configure account recovery settings
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+
+  # Customize verification messages
+  verification_message_template {
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject         = "Your FileShare Plus verification code"
+    email_message         = "Your verification code for FileShare Plus is {####}. Please enter this code to complete your account setup."
+  }
 
   password_policy {
     minimum_length    = 8
