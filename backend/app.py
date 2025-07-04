@@ -158,6 +158,19 @@ def health_check():
     return jsonify({"status": "ok", "message": "Backend is healthy"})
 
 # --- UPDATED: This endpoint is now protected ---
+def sanitize_filename(filename):
+    """Sanitize filename by replacing problematic characters"""
+    # Replace common problematic characters
+    sanitized = filename.replace('&', '-')  # Replace & with -
+    sanitized = sanitized.replace('#', '-')  # Replace # with -
+    sanitized = sanitized.replace('?', '-')  # Replace ? with -
+    sanitized = sanitized.replace('%', '-')  # Replace % with -
+    sanitized = sanitized.replace('+', '-')  # Replace + with -
+    # Remove any other potentially problematic characters but keep spaces
+    import re
+    sanitized = re.sub(r'[<>:"|*]', '-', sanitized)
+    return sanitized
+
 @app.route("/api/upload", methods=['POST'])
 @token_required
 def upload_file(decoded_token): # The decoded token is passed by the decorator
@@ -171,14 +184,19 @@ def upload_file(decoded_token): # The decoded token is passed by the decorator
 
     if file and S3_BUCKET_NAME:
         try:
+            # Sanitize the filename to avoid issues with special characters
+            sanitized_filename = sanitize_filename(file.filename)
+            print(f"Original filename: {file.filename}")
+            print(f"Sanitized filename: {sanitized_filename}")
+            
             # You could use the user's ID from the token to create user-specific folders in S3
             user_id = decoded_token.get('sub')
-            file_key = f"{user_id}/{file.filename}"
+            file_key = f"{user_id}/{sanitized_filename}"
 
             s3.upload_fileobj(file, S3_BUCKET_NAME, file_key)
             return jsonify({
                 'message': 'File successfully uploaded',
-                'file_name': file_key # Return the full key
+                'file_name': file_key # Return the full key with sanitized name
             }), 200
         except Exception as e:
             return jsonify({'message': f'An error occurred: {e}'}), 500
