@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // Import necessary Amplify v6 components and utilities
-import { fetchAuthSession, signOut as amplifySignOut, signUp, signIn, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
+import { fetchAuthSession, signOut as amplifySignOut, signUp, signIn, confirmSignUp, getCurrentUser, resetPassword, confirmResetPassword } from 'aws-amplify/auth';
 import { Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import { Amplify } from 'aws-amplify';
 import '@aws-amplify/ui-react/styles.css';
@@ -27,7 +27,12 @@ const CustomAuth = ({ onAuthenticated }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
-  const [generatedUsername, setGeneratedUsername] = useState('');  const handleSignUp = async (e) => {
+  const [generatedUsername, setGeneratedUsername] = useState('');
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showResetCodeForm, setShowResetCodeForm] = useState(false);  const handleSignUp = async (e) => {
     e.preventDefault();
     console.log('=== CUSTOM SIGNUP FUNCTION CALLED ===');
     console.log('Email:', email);
@@ -118,6 +123,157 @@ const CustomAuth = ({ onAuthenticated }) => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await resetPassword({
+        username: email,
+      });
+      
+      console.log('Password reset code sent successfully');
+      setShowResetCodeForm(true);
+      setError(''); // Clear any previous errors
+    } catch (error) {
+      console.error('Reset password error:', error);
+      setError(error.message || 'Failed to send reset code. Please check your email address.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmResetPassword = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      await confirmResetPassword({
+        username: email,
+        confirmationCode: resetCode,
+        newPassword: newPassword,
+      });
+      
+      console.log('Password reset successful');
+      // Reset form and go back to sign in
+      setForgotPasswordMode(false);
+      setShowResetCodeForm(false);
+      setIsSignUp(false);
+      setResetCode('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setError('Password reset successful! You can now sign in with your new password.');
+    } catch (error) {
+      console.error('Confirm reset password error:', error);
+      setError(error.message || 'Failed to reset password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Forgot Password Flow
+  if (forgotPasswordMode) {
+    if (showResetCodeForm) {
+      return (
+        <Card style={{ maxWidth: '400px', margin: '2rem auto', padding: '2rem' }}>
+          <Heading level={2}>Reset Password</Heading>
+          <Text style={{ marginBottom: '1rem', color: 'green' }}>
+            Reset code sent to {email}! Check your email and enter the code below.
+          </Text>
+          <form onSubmit={handleConfirmResetPassword}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label>Reset Code:</label>
+              <input
+                type="text"
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value)}
+                required
+                placeholder="Enter the code from your email"
+                style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+              />
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label>New Password:</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+              />
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label>Confirm New Password:</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                required
+                style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+              />
+            </div>
+            {error && <Text color="red" style={{ marginBottom: '1rem' }}>{error}</Text>}
+            <Button type="submit" isLoading={isLoading} style={{ width: '100%', marginBottom: '1rem' }}>
+              Reset Password
+            </Button>
+          </form>
+          <Button
+            variation="link"
+            onClick={() => {
+              setForgotPasswordMode(false);
+              setShowResetCodeForm(false);
+              setError('');
+            }}
+            style={{ width: '100%' }}
+          >
+            Back to Sign In
+          </Button>
+        </Card>
+      );
+    } else {
+      return (
+        <Card style={{ maxWidth: '400px', margin: '2rem auto', padding: '2rem' }}>
+          <Heading level={2}>Forgot Password</Heading>
+          <Text style={{ marginBottom: '1rem' }}>Enter your email address and we'll send you a reset code.</Text>
+          <form onSubmit={handleForgotPassword}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label>Email:</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+              />
+            </div>
+            {error && <Text color="red" style={{ marginBottom: '1rem' }}>{error}</Text>}
+            <Button type="submit" isLoading={isLoading} style={{ width: '100%', marginBottom: '1rem' }}>
+              Send Reset Code
+            </Button>
+          </form>
+          <Button
+            variation="link"
+            onClick={() => {
+              setForgotPasswordMode(false);
+              setError('');
+            }}
+            style={{ width: '100%' }}
+          >
+            Back to Sign In
+          </Button>
+        </Card>
+      );
+    }
+  }
+
   if (needsConfirmation) {
     return (
       <Card style={{ maxWidth: '400px', margin: '2rem auto', padding: '2rem' }}>
@@ -188,12 +344,26 @@ const CustomAuth = ({ onAuthenticated }) => {
         variation="link"
         onClick={() => {
           setIsSignUp(!isSignUp);
+          setForgotPasswordMode(false);
+          setShowResetCodeForm(false);
           setError('');
         }}
         style={{ width: '100%' }}
       >
         {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
       </Button>
+      {!isSignUp && (
+        <Button
+          variation="link"
+          onClick={() => {
+            setForgotPasswordMode(true);
+            setError('');
+          }}
+          style={{ width: '100%', marginTop: '0.5rem' }}
+        >
+          Forgot your password?
+        </Button>
+      )}
     </Card>
   );
 };
