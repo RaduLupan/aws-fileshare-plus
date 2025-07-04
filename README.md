@@ -233,3 +233,38 @@ terraform output frontend_url
 6. **CI/CD Pipeline:** Automate the build, test, and deployment process (e.g., with GitHub Actions, AWS CodePipeline).
 7. **Error Handling & Monitoring:** Improve error handling in both frontend and backend, add more robust logging and monitoring (e.g., with CloudWatch Alarms).
 8. **Cost Optimization:** Implement S3 lifecycle policies for uploaded files (e.g., move to Glacier after a period, delete after X days).
+
+## 🎉 Milestone: Core MVP Functionality Complete (July 2025)
+
+### ✅ What's Working
+- **User Authentication**: Complete AWS Cognito integration with auto-confirmation in dev environment
+- **File Upload**: Users can upload files to user-specific S3 folders
+- **File Download**: Generated presigned URLs work with special characters (including "&", quotes, etc.)
+- **Infrastructure**: Full Terraform deployment with ECS, ALB, CloudFront, and S3
+- **Security**: JWT validation, CORS properly configured, user isolation in S3
+
+### 🔧 Technical Achievements
+- **File Name Sanitization**: Backend automatically replaces problematic characters (`&`, `<`, `>`, `:`, `"`, `|`, `?`, `*`) with `-` for safe S3 storage
+- **Robust URL Handling**: Uses standard `encodeURIComponent`/`unquote` for reliable parameter passing
+- **User-Specific Storage**: Files stored in `{user_id}/{filename}` structure in S3
+- **Tiered Access**: Free tier (3-day links) and premium tier (30-day links) system implemented
+- **Production-Ready**: GitHub Actions workflows for automated deployment
+
+### 📁 Current Architecture Status
+```
+✅ Frontend (React + Vite) → CloudFront → S3
+✅ Backend (Flask) → ECS Fargate → ALB
+✅ Authentication → AWS Cognito
+✅ File Storage → S3 with user folders
+✅ Infrastructure → Terraform modules
+✅ CI/CD → GitHub Actions
+```
+
+### 🎯 Next Steps for Production
+1. **Code Cleanup**: Remove debug logging from both frontend and backend
+2. **Error Handling**: Improve user-facing error messages
+3. **UX Improvements**: Add file upload progress, copy-to-clipboard for links
+4. **Monitoring**: Set up CloudWatch alerts and dashboards
+5. **Documentation**: API documentation and deployment guides
+
+---
