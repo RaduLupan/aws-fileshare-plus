@@ -180,6 +180,26 @@ const CustomAuth = ({ onAuthenticated }) => {
     }
   };
 
+  // Handle resending reset code
+  const handleResendResetCode = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await resetPassword({
+        username: email,
+      });
+      
+      console.log('Password reset code resent successfully');
+      setError('Reset code resent! Check your email.');
+    } catch (error) {
+      console.error('Resend reset code error:', error);
+      setError(error.message || 'Failed to resend reset code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Forgot Password Flow
   if (forgotPasswordMode) {
     if (showResetCodeForm) {
@@ -190,18 +210,32 @@ const CustomAuth = ({ onAuthenticated }) => {
             Reset code sent to {email}! Check your email and enter the code below.
           </Text>
           <form onSubmit={handleConfirmResetPassword}>
+            {/* Dummy hidden fields to confuse autofill */}
+            <input type="text" style={{ display: 'none' }} autoComplete="username" />
+            <input type="password" style={{ display: 'none' }} autoComplete="current-password" />
+            
             <div style={{ marginBottom: '1rem' }}>
               <label>Reset Code:</label>
               <input
                 type="text"
                 value={resetCode}
                 onChange={(e) => setResetCode(e.target.value)}
+                onFocus={(e) => {
+                  // Force clear the field if it contains email-like content
+                  if (resetCode.includes('@') || resetCode.includes('.com')) {
+                    setResetCode('');
+                  }
+                }}
                 required
                 placeholder="Enter the code from your email"
-                autoComplete="off"
+                autoComplete="new-password"
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck="false"
+                name="reset-verification-code"
+                id="reset-verification-code"
+                data-lpignore="true"
+                data-form-type=""
                 style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
               />
             </div>
@@ -230,6 +264,14 @@ const CustomAuth = ({ onAuthenticated }) => {
               Reset Password
             </Button>
           </form>
+          <Button
+            variation="link"
+            onClick={handleResendResetCode}
+            isLoading={isLoading}
+            style={{ width: '100%', marginBottom: '1rem' }}
+          >
+            Resend Code
+          </Button>
           <Button
             variation="link"
             onClick={() => {
