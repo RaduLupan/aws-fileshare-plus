@@ -11,7 +11,6 @@ from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
-from urllib.parse import unquote
 
 app = Flask(__name__)
 
@@ -187,29 +186,20 @@ def upload_file(decoded_token): # The decoded token is passed by the decorator
     return jsonify({'message': 'S3 bucket not configured'}), 500
 
 # --- UPDATED: This endpoint is protected and has tiered logic ---
-@app.route("/api/get-download-link", methods=['GET', 'POST'])
+@app.route("/api/get-download-link", methods=['POST'])
 @token_required
 def get_download_link(decoded_token):
-    # Handle both GET (with query param) and POST (with JSON body) requests
-    if request.method == 'POST':
-        data = request.get_json()
-        file_name = data.get('file_name') if data else None
-    else:
-        file_name = request.args.get('file_name')
+    # Use POST method with JSON body to avoid URL query parameter issues with special characters
+    data = request.get_json()
+    if not data or 'file_name' not in data:
+        return jsonify({'message': 'Missing file_name in request body'}), 400
     
-    if not file_name:
-        return jsonify({'message': 'Missing file_name parameter'}), 400
-    
-    # Decode URL-encoded file name only if it's from GET request
-    if request.method == 'GET':
-        decoded_file_name = unquote(file_name)
-    else:
-        decoded_file_name = file_name
+    file_name = data.get('file_name')
     
     print(f"Request method: {request.method}")
-    print(f"Original file_name: {file_name}")
-    print(f"Decoded file_name: {decoded_file_name}")
-    print(f"File name length: {len(decoded_file_name)}")
+    print(f"File name from JSON body: {file_name}")
+    print(f"File name length: {len(file_name)}")
+    print(f"File name representation: {repr(file_name)}")
     
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
@@ -224,17 +214,17 @@ def get_download_link(decoded_token):
     try:
         url = s3.generate_presigned_url(
             'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': decoded_file_name},
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': file_name},
             ExpiresIn=expiration_seconds
         )
-        print(f"Generated presigned URL for S3 key: {decoded_file_name}")
+        print(f"Generated presigned URL for S3 key: {file_name}")
         return jsonify({
             'download_url': url,
             'tier': tier,
             'expires_in_seconds': expiration_seconds
         })
     except Exception as e:
-        print(f"Error generating presigned URL for key '{decoded_file_name}': {e}")
+        print(f"Error generating presigned URL for key '{file_name}': {e}")
         return jsonify({'message': f'Could not generate presigned URL: {e}'}), 500
 
 # --- NEW: Endpoint to handle tier upgrade ---
