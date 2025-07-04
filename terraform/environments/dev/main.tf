@@ -85,6 +85,21 @@ module "cognito" {
 
   project_name = var.project_name
   environment  = var.environment
+  
+  # Pass SES configuration for custom email
+  ses_email_identity_arn = module.ses_email.domain_identity_arn
+  from_email_address     = module.ses_email.from_email_address
+  reply_to_email_address = module.ses_email.from_email_address
+}
+
+# Call the SES email module for better email deliverability
+module "ses_email" {
+  source = "../../modules/ses-email"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  domain_name        = "lupan.ca"
+  from_email_address = "noreply@lupan.ca"
 }
 
 # Output relevant values from the modules
@@ -137,4 +152,20 @@ output "user_pool_id" {
 output "user_pool_client_id" {
   description = "The ID of the Cognito User Pool Client."
   value       = module.cognito.user_pool_client_id
+}
+
+# SES Email Configuration Outputs
+output "ses_domain_verification_token" {
+  description = "The SES domain verification token for DNS setup"
+  value       = module.ses_email.domain_verification_token
+}
+
+output "ses_dkim_tokens" {
+  description = "The SES DKIM tokens for DNS setup"
+  value       = module.ses_email.dkim_tokens
+}
+
+output "ses_from_email" {
+  description = "The configured from email address"
+  value       = module.ses_email.from_email_address
 }
