@@ -204,20 +204,24 @@ def upload_file(decoded_token): # The decoded token is passed by the decorator
     return jsonify({'message': 'S3 bucket not configured'}), 500
 
 # --- UPDATED: This endpoint is protected and has tiered logic ---
-@app.route("/api/get-download-link", methods=['POST'])
+@app.route("/api/get-download-link", methods=['GET'])
 @token_required
 def get_download_link(decoded_token):
-    # Use POST method with JSON body to avoid URL query parameter issues with special characters
-    data = request.get_json()
-    if not data or 'file_name' not in data:
-        return jsonify({'message': 'Missing file_name in request body'}), 400
+    # Use GET method with base64 encoded file name to avoid URL issues
+    encoded_file_name = request.args.get('file_name')
+    if not encoded_file_name:
+        return jsonify({'message': 'Missing file_name parameter'}), 400
     
-    file_name = data.get('file_name')
-    
-    print(f"Request method: {request.method}")
-    print(f"File name from JSON body: {file_name}")
-    print(f"File name length: {len(file_name)}")
-    print(f"File name representation: {repr(file_name)}")
+    try:
+        # Decode base64 encoded file name
+        import base64
+        file_name = base64.b64decode(encoded_file_name.encode()).decode('utf-8')
+        print(f"Encoded file_name: {encoded_file_name}")
+        print(f"Decoded file_name: {file_name}")
+        print(f"File name length: {len(file_name)}")
+    except Exception as e:
+        print(f"Error decoding file name: {e}")
+        return jsonify({'message': 'Invalid file_name encoding'}), 400
     
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
