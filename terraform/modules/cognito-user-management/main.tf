@@ -11,18 +11,11 @@ resource "aws_cognito_user_pool" "this" {
   # Enable email verification for password reset and account recovery
   auto_verified_attributes = ["email"]
   
-  # Enable SMS as an alternative (requires phone number)
-  alias_attributes = ["email", "phone_number"]
-  
-  # Configure account recovery settings with both email and SMS
+  # Configure account recovery settings
   account_recovery_setting {
     recovery_mechanism {
       name     = "verified_email"
       priority = 1
-    }
-    recovery_mechanism {
-      name     = "verified_phone_number"
-      priority = 2
     }
   }
 
@@ -58,11 +51,11 @@ resource "aws_cognito_user_pool" "this" {
     }
   }
 
-  # SMS configuration for alternative verification
-  sms_configuration {
-    external_id    = "${var.project_name}-${var.environment}-sms"
-    sns_caller_arn = aws_iam_role.cognito_sms_role.arn
-  }
+  # SMS configuration for alternative verification (commented out for now)
+  # sms_configuration {
+  #   external_id    = "${var.project_name}-${var.environment}-sms"
+  #   sns_caller_arn = aws_iam_role.cognito_sms_role.arn
+  # }
 
   tags = {
     Environment = var.environment
@@ -212,44 +205,44 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attach" {
 }
 
 # -----------------------------------------------------------------------------
-# IAM Role for Cognito SMS
+# IAM Role for Cognito SMS (commented out for now)
 # -----------------------------------------------------------------------------
-resource "aws_iam_role" "cognito_sms_role" {
-  name = "${var.project_name}-${var.environment}-cognito-sms-role"
+# resource "aws_iam_role" "cognito_sms_role" {
+#   name = "${var.project_name}-${var.environment}-cognito-sms-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "cognito-idp.amazonaws.com"
-        }
-      }
-    ]
-  })
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Action = "sts:AssumeRole"
+#         Effect = "Allow"
+#         Principal = {
+#           Service = "cognito-idp.amazonaws.com"
+#         }
+#       }
+#     ]
+#   })
 
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
+#   tags = {
+#     Environment = var.environment
+#     Project     = var.project_name
+#   }
+# }
 
-resource "aws_iam_role_policy" "cognito_sms_policy" {
-  name = "${var.project_name}-${var.environment}-cognito-sms-policy"
-  role = aws_iam_role.cognito_sms_role.id
+# resource "aws_iam_role_policy" "cognito_sms_policy" {
+#   name = "${var.project_name}-${var.environment}-cognito-sms-policy"
+#   role = aws_iam_role.cognito_sms_role.id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "sns:Publish"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "sns:Publish"
+#         ]
+#         Resource = "*"
+#       }
+#     ]
+#   })
+# }
