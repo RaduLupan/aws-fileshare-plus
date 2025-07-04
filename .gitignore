@@ -30,6 +30,7 @@ node_modules/
 
 # build directories
 build/
+dist/
 
 # Environment variables
 .env
