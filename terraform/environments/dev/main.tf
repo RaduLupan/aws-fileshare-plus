@@ -86,10 +86,10 @@ module "cognito" {
   project_name = var.project_name
   environment  = var.environment
   
-  # Pass SES configuration for custom email
-  ses_email_identity_arn = module.ses_email.domain_identity_arn
-  from_email_address     = module.ses_email.from_email_address
-  reply_to_email_address = module.ses_email.from_email_address
+  # Pass SES configuration for custom email (only if SES is enabled)
+  ses_email_identity_arn = module.ses_email.ses_enabled ? module.ses_email.domain_identity_arn : null
+  from_email_address     = module.ses_email.ses_enabled ? module.ses_email.from_email_address : null
+  reply_to_email_address = module.ses_email.ses_enabled ? module.ses_email.from_email_address : null
 }
 
 # Call the SES email module for better email deliverability
@@ -98,8 +98,8 @@ module "ses_email" {
 
   project_name       = var.project_name
   environment        = var.environment
-  domain_name        = "lupan.ca"
-  from_email_address = "noreply@lupan.ca"
+  domain_name        = var.ses_domain_name        # Will be set in dev.tfvars
+  from_email_address = var.ses_from_email_address # Will be set in dev.tfvars
 }
 
 # Output relevant values from the modules
@@ -156,16 +156,26 @@ output "user_pool_client_id" {
 
 # SES Email Configuration Outputs
 output "ses_domain_verification_token" {
-  description = "The SES domain verification token for DNS setup"
+  description = "The SES domain verification token for DNS setup (null if no custom domain)"
   value       = module.ses_email.domain_verification_token
 }
 
 output "ses_dkim_tokens" {
-  description = "The SES DKIM tokens for DNS setup"
+  description = "The SES DKIM tokens for DNS setup (empty if no custom domain)"
   value       = module.ses_email.dkim_tokens
 }
 
 output "ses_from_email" {
-  description = "The configured from email address"
+  description = "The configured from email address (null if no custom domain)"
   value       = module.ses_email.from_email_address
+}
+
+output "ses_enabled" {
+  description = "Whether custom SES domain is enabled"
+  value       = module.ses_email.ses_enabled
+}
+
+output "ses_domain_name" {
+  description = "The SES domain name (null if no custom domain)"
+  value       = module.ses_email.domain_name
 }
