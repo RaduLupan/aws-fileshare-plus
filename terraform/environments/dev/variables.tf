@@ -77,3 +77,18 @@ variable "alb_https_port_for_frontend" {
 # The frontend module's alb_http_port and alb_https_port variables are
 # defining what the *frontend CloudFront distribution* needs to know
 # to talk to the backend. They happen to be the same values.
+
+# -----------------------------------------------------------------------------
+# SES Email Configuration Variables
+# -----------------------------------------------------------------------------
+variable "ses_domain_name" {
+  description = "The domain name for SES email (e.g., aws.lupan.ca). Must be hosted in Route 53. Set to null to use default SES domain."
+  type        = string
+  default     = null
+}
+
+variable "ses_from_email_address" {
+  description = "The email address to send from (e.g., noreply@aws.lupan.ca). Only used if ses_domain_name is provided."
+  type        = string
+  default     = null
+}
