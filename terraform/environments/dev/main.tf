@@ -161,8 +161,8 @@ output "ses_domain_verification_token" {
 }
 
 output "ses_dkim_tokens" {
-  description = "The SES DKIM tokens for DNS setup (empty if no custom domain)"
-  value       = module.ses_email.dkim_tokens
+  description = "The SES DKIM tokens for DNS setup (JSON string, empty array if no custom domain)"
+  value       = jsonencode(module.ses_email.dkim_tokens)
 }
 
 output "ses_from_email" {
