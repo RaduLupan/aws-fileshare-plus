@@ -633,11 +633,23 @@ Best regards!`;
       // Create mailto URL
       const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
-      // Open email client
-      window.location.href = mailtoUrl;
+      console.log('Generated mailto URL:', mailtoUrl);
       
-      setMessage(`Email client opened with download link for "${filename}"`);
-      setTimeout(() => setMessage(''), 3000);
+      // Use the same method as free tier
+      try {
+        window.open(mailtoUrl, '_blank');
+        setMessage(`Email client opened with download link for "${filename}"`);
+        setTimeout(() => setMessage(''), 4000);
+      } catch (emailError) {
+        console.error('Error opening email client:', emailError);
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(data.download_url).then(() => {
+          setMessage(`Email client couldn't open. Download link copied to clipboard for: ${filename}`);
+        }).catch(() => {
+          setMessage(`Email client couldn't open. Manual link: ${data.download_url}`);
+        });
+        setTimeout(() => setMessage(''), 6000);
+      }
 
     } catch (error) {
       console.error('Error creating email link:', error);
