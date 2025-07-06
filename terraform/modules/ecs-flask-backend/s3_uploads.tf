@@ -58,9 +58,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads_backend_lifecycle" {
       noncurrent_days = var.file_retention_days
     }
   }
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
 }
