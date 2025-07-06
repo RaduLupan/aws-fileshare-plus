@@ -92,3 +92,12 @@ variable "ses_from_email_address" {
   type        = string
   default     = null
 }
+
+# -----------------------------------------------------------------------------
+# File Storage Configuration
+# -----------------------------------------------------------------------------
+variable "file_retention_days" {
+  description = "The number of days to retain uploaded files in S3 before automatic deletion."
+  type        = number
+  default     = 30
+}

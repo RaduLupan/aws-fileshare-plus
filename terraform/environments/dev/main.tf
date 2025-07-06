@@ -78,6 +78,9 @@ module "backend_app" {
   # Add this line to connect the modules:
   cognito_user_pool_id = module.cognito.user_pool_id
   cognito_client_id    = module.cognito.user_pool_client_id
+
+  # Configure file retention period for S3 lifecycle policy
+  file_retention_days = var.file_retention_days
 }
 
 module "cognito" {

@@ -34,3 +34,33 @@ resource "aws_s3_bucket_versioning" "uploads_backend_versioning" {
 resource "random_id" "uploads_bucket_suffix" {
   byte_length = 6
 }
+
+# S3 Lifecycle policy to automatically delete files after retention period
+resource "aws_s3_bucket_lifecycle_configuration" "uploads_backend_lifecycle" {
+  bucket = aws_s3_bucket.uploads_backend.id
+
+  rule {
+    id     = "delete_old_files"
+    status = "Enabled"
+
+    # Delete objects after the specified retention period
+    expiration {
+      days = var.file_retention_days
+    }
+
+    # Also delete incomplete multipart uploads after 7 days to save costs
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+
+    # Clean up old versions if versioning is enabled
+    noncurrent_version_expiration {
+      noncurrent_days = var.file_retention_days
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}

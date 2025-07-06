@@ -15,3 +15,6 @@ cloudfront_viewer_protocol_policy = "redirect-to-https"                         
 # SES Email Configuration for custom domain (temporarily disabled until production access approved)
 # ses_domain_name        = "aws.lupan.ca"
 # ses_from_email_address = "noreply@aws.lupan.ca"
+
+# File Storage Configuration
+file_retention_days = 30  # Files will be automatically deleted after 30 days

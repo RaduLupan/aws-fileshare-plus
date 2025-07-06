@@ -139,3 +139,9 @@ variable "log_retention_in_days" {
   type        = number
   default     = 30
 }
+
+variable "file_retention_days" {
+  description = "The number of days to retain uploaded files in S3 before automatic deletion."
+  type        = number
+  default     = 30
+}
