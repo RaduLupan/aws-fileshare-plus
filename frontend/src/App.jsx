@@ -593,6 +593,58 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
     }
   };
 
+  const emailLink = async (fileKey, filename) => {
+    try {
+      const token = await getJwtToken();
+      if (!token) {
+        setError('Authentication error. Please sign in again.');
+        return;
+      }
+
+      // Generate a new download link first
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const response = await fetch(`${apiUrl}/api/files/new-link`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ file_key: fileKey })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate download link');
+      }
+
+      // Create email content
+      const subject = `File shared with you: ${filename}`;
+      const body = `Hi there,
+
+I wanted to share a file with you: ${filename}
+
+Download Link: ${data.download_url}
+
+This link will expire in ${data.expires_in_days} days.
+
+Best regards!`;
+
+      // Create mailto URL
+      const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Open email client
+      window.location.href = mailtoUrl;
+      
+      setMessage(`Email client opened with download link for "${filename}"`);
+      setTimeout(() => setMessage(''), 3000);
+
+    } catch (error) {
+      console.error('Error creating email link:', error);
+      setError(error.message || 'Failed to create email link');
+    }
+  };
+
   return (
     <Flex direction="column" alignItems="center" padding="2rem">
       <Card style={{ maxWidth: '800px', width: '100%', padding: '2rem' }}>
