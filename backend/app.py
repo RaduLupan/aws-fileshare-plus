@@ -269,19 +269,42 @@ def get_download_link(decoded_token):
 @app.route("/api/upgrade", methods=['POST'])
 @token_required
 def upgrade_tier(decoded_token):
-    user_pool_id = decoded_token['iss'].split('/')[-1]
-    user_name = decoded_token['username'] # Or 'cognito:username' depending on your setup
-
     try:
+        # Debug: Print the decoded token to see its structure
+        print("=== UPGRADE DEBUG INFO ===")
+        print(f"Decoded token: {json.dumps(decoded_token, indent=2, default=str)}")
+        print("=== END UPGRADE DEBUG INFO ===")
+        
+        # Extract username from token (could be 'username', 'cognito:username', or 'sub')
+        user_name = decoded_token.get('username') or decoded_token.get('cognito:username') or decoded_token.get('sub')
+        
+        if not user_name:
+            print("Error: Could not extract username from token")
+            return jsonify({'message': 'Could not extract username from token'}), 400
+        
+        # Use the environment variable for user pool ID
+        user_pool_id = COGNITO_USER_POOL_ID
+        
+        if not user_pool_id:
+            print("Error: COGNITO_USER_POOL_ID not set")
+            return jsonify({'message': 'Cognito configuration error'}), 500
+        
+        print(f"Upgrading user '{user_name}' to premium tier in pool '{user_pool_id}'")
+        
         # For this demo, we just upgrade. In a real app, you'd verify a payment webhook first.
-        print(f"Upgrading user '{user_name}' to premium tier.")
         
         # Remove from free tier first (optional, but good practice)
-        cognito_client.admin_remove_user_from_group(
-            UserPoolId=user_pool_id,
-            Username=user_name,
-            GroupName='free-tier'
-        )
+        try:
+            cognito_client.admin_remove_user_from_group(
+                UserPoolId=user_pool_id,
+                Username=user_name,
+                GroupName='free-tier'
+            )
+            print(f"Removed user '{user_name}' from free-tier group")
+        except cognito_client.exceptions.ClientError as e:
+            # It's okay if user wasn't in free tier
+            if e.response['Error']['Code'] != 'UserNotInGroupException':
+                print(f"Warning: Could not remove user from free-tier: {e}")
 
         # Add to premium tier
         cognito_client.admin_add_user_to_group(
@@ -289,12 +312,15 @@ def upgrade_tier(decoded_token):
             Username=user_name,
             GroupName='premium-tier'
         )
+        print(f"Added user '{user_name}' to premium-tier group")
         
         return jsonify({'message': 'User successfully upgraded to premium tier.'}), 200
 
     except Exception as e:
         print(f"Error upgrading user tier: {e}")
-        return jsonify({'message': f'An error occurred during upgrade: {e}'}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': f'An error occurred during upgrade: {str(e)}'}), 500
 
 
 # --- NEW: Premium File Management Endpoints ---
