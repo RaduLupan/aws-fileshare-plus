@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // Import necessary Amplify v6 components and utilities
-import { fetchAuthSession, signOut as amplifySignOut, signUp, signIn, confirmSignUp, getCurrentUser, resetPassword, confirmResetPassword } from 'aws-amplify/auth';
+import { fetchAuthSession, signOut as amplifySignOut, signUp, signIn, confirmSignUp, getCurrentUser, fetchUserAttributes, resetPassword, confirmResetPassword } from 'aws-amplify/auth';
 import { Button, Heading, Text, Flex, Card } from '@aws-amplify/ui-react';
 import { Amplify } from 'aws-amplify';
 import '@aws-amplify/ui-react/styles.css';
@@ -602,7 +602,7 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
         </Flex>
 
         <Text marginBottom="1rem">
-          Welcome {user?.username}! You have <strong>{tier}</strong> tier access.
+          Welcome {user?.displayName || user?.email || user?.username}! You have <strong>{tier}</strong> tier access.
         </Text>
 
         {/* Upload Section */}
@@ -1010,7 +1010,19 @@ export default function App() {
           try {
             const currentUser = await getCurrentUser();
             console.log("Current user found:", currentUser);
-            setUser(currentUser);
+            
+            // Fetch user attributes to get email
+            const userAttributes = await fetchUserAttributes();
+            console.log("User attributes:", userAttributes);
+            
+            // Create enhanced user object with email
+            const enhancedUser = {
+              ...currentUser,
+              email: userAttributes.email,
+              displayName: userAttributes.email // Use email as display name
+            };
+            
+            setUser(enhancedUser);
             setIsAuthenticated(true);
           } catch (error) {
             console.log("No current user session");
@@ -1032,7 +1044,20 @@ export default function App() {
   const handleAuthenticated = async () => {
     try {
       const currentUser = await getCurrentUser();
-      setUser(currentUser);
+      console.log("Current user after authentication:", currentUser);
+      
+      // Fetch user attributes to get email
+      const userAttributes = await fetchUserAttributes();
+      console.log("User attributes after authentication:", userAttributes);
+      
+      // Create enhanced user object with email
+      const enhancedUser = {
+        ...currentUser,
+        email: userAttributes.email,
+        displayName: userAttributes.email // Use email as display name
+      };
+      
+      setUser(enhancedUser);
       setIsAuthenticated(true);
     } catch (error) {
       console.error("Error getting current user after authentication:", error);
