@@ -297,5 +297,168 @@ def upgrade_tier(decoded_token):
         return jsonify({'message': f'An error occurred during upgrade: {e}'}), 500
 
 
+# --- NEW: Premium File Management Endpoints ---
+
+@app.route("/api/files", methods=['GET'])
+@token_required
+def list_user_files(decoded_token):
+    """List all files for the authenticated user with metadata (Premium feature)"""
+    
+    # Check if user has premium access
+    user_groups = decoded_token.get('cognito:groups', [])
+    if 'premium-tier' not in user_groups:
+        return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+    
+    user_folder = get_user_folder_name(decoded_token)
+    if not user_folder:
+        return jsonify({'message': 'User identification not found in token'}), 400
+    
+    try:
+        print(f"Listing files for user folder: {user_folder}")
+        
+        # List S3 objects with metadata for the user's folder
+        response = s3.list_objects_v2(
+            Bucket=S3_BUCKET_NAME,
+            Prefix=f"{user_folder}/"
+        )
+        
+        files = []
+        for obj in response.get('Contents', []):
+            # Skip the folder itself (empty key)
+            if obj['Key'] == f"{user_folder}/":
+                continue
+                
+            # Extract filename from S3 key (remove folder prefix)
+            filename = obj['Key'].replace(f"{user_folder}/", "")
+            
+            # Format file size in human-readable format
+            size_bytes = obj['Size']
+            if size_bytes < 1024:
+                size_display = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_display = f"{size_bytes / 1024:.1f} KB"
+            else:
+                size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
+            
+            files.append({
+                'key': obj['Key'],
+                'filename': filename,
+                'size_bytes': size_bytes,
+                'size_display': size_display,
+                'last_modified': obj['LastModified'].isoformat(),
+                'upload_date': obj['LastModified'].strftime('%b %d, %Y')
+            })
+        
+        # Sort files by last modified (newest first)
+        files.sort(key=lambda x: x['last_modified'], reverse=True)
+        
+        print(f"Found {len(files)} files for user {user_folder}")
+        return jsonify({
+            'files': files,
+            'total_count': len(files),
+            'user_folder': user_folder
+        })
+        
+    except Exception as e:
+        print(f"Error listing files for user {user_folder}: {e}")
+        return jsonify({'message': f'Error retrieving files: {e}'}), 500
+
+
+@app.route("/api/files/new-link", methods=['POST'])
+@token_required  
+def generate_new_download_link(decoded_token):
+    """Generate a new download link for an existing file (Premium feature)"""
+    
+    # Check if user has premium access
+    user_groups = decoded_token.get('cognito:groups', [])
+    if 'premium-tier' not in user_groups:
+        return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+    
+    data = request.get_json()
+    if not data or 'file_key' not in data:
+        return jsonify({'message': 'Missing file_key parameter'}), 400
+    
+    file_key = data['file_key']
+    user_folder = get_user_folder_name(decoded_token)
+    
+    # Security check: ensure file belongs to the authenticated user
+    if not file_key.startswith(f"{user_folder}/"):
+        return jsonify({'message': 'Access denied - file does not belong to user'}), 403
+    
+    try:
+        print(f"Generating new link for file: {file_key}")
+        
+        # Check if file exists in S3
+        s3.head_object(Bucket=S3_BUCKET_NAME, Key=file_key)
+        
+        # Determine expiration time based on user's tier
+        if 'premium-tier' in user_groups:
+            expiration_seconds = 2592000  # 30 days
+            tier = 'premium'
+        else:
+            expiration_seconds = 259200   # 3 days (fallback)
+            tier = 'free'
+        
+        # Generate new presigned URL
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': file_key},
+            ExpiresIn=expiration_seconds
+        )
+        
+        print(f"Generated new presigned URL for: {file_key}")
+        return jsonify({
+            'download_url': url,
+            'file_key': file_key,
+            'tier': tier,
+            'expires_in_seconds': expiration_seconds,
+            'expires_in_days': expiration_seconds // 86400
+        })
+        
+    except s3.exceptions.NoSuchKey:
+        return jsonify({'message': 'File not found'}), 404
+    except Exception as e:
+        print(f"Error generating new link for {file_key}: {e}")
+        return jsonify({'message': f'Error generating download link: {e}'}), 500
+
+
+@app.route("/api/files/<path:file_key>", methods=['DELETE'])
+@token_required
+def delete_user_file(decoded_token, file_key):
+    """Delete a specific file from S3 (Premium feature)"""
+    
+    # Check if user has premium access
+    user_groups = decoded_token.get('cognito:groups', [])
+    if 'premium-tier' not in user_groups:
+        return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+    
+    user_folder = get_user_folder_name(decoded_token)
+    
+    # Security check: ensure file belongs to the authenticated user
+    if not file_key.startswith(f"{user_folder}/"):
+        return jsonify({'message': 'Access denied - file does not belong to user'}), 403
+    
+    try:
+        print(f"Deleting file: {file_key}")
+        
+        # Check if file exists before trying to delete
+        s3.head_object(Bucket=S3_BUCKET_NAME, Key=file_key)
+        
+        # Delete the file from S3
+        s3.delete_object(Bucket=S3_BUCKET_NAME, Key=file_key)
+        
+        print(f"Successfully deleted file: {file_key}")
+        return jsonify({
+            'message': 'File successfully deleted',
+            'deleted_file': file_key
+        })
+        
+    except s3.exceptions.NoSuchKey:
+        return jsonify({'message': 'File not found'}), 404
+    except Exception as e:
+        print(f"Error deleting file {file_key}: {e}")
+        return jsonify({'message': f'Error deleting file: {e}'}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
