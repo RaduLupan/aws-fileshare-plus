@@ -1062,6 +1062,23 @@ Powered by FileShare Plus - Secure file sharing made simple`);
               >
                 Email Link
               </Button>
+              <Button 
+                size="small" 
+                variation="link" 
+                onClick={() => {
+                  console.log('Simple mailto test clicked');
+                  const simpleMailto = 'mailto:test@example.com?subject=Test&body=Hello%20World';
+                  console.log('Simple mailto URL:', simpleMailto);
+                  const result = window.open(simpleMailto, '_blank');
+                  console.log('Simple mailto result:', result);
+                }}
+                fontSize="0.8rem"
+                padding="0.25rem 0.5rem"
+                title="Test simple mailto functionality"
+                style={{ color: 'red' }}
+              >
+                Test mailto
+              </Button>
             </Flex>
           </Flex>
         )}
