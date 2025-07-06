@@ -171,6 +171,23 @@ def sanitize_filename(filename):
     sanitized = re.sub(r'[<>:"|*]', '-', sanitized)
     return sanitized
 
+def get_user_folder_name(decoded_token):
+    """Extract user folder name from JWT token - uses email for clean structure"""
+    # Try to get email first (most reliable)
+    user_email = decoded_token.get('email')
+    if user_email:
+        return user_email
+    
+    # Fallback to username (which should be email in our setup)
+    username = decoded_token.get('username')
+    if username:
+        return username
+    
+    # Last resort: use user ID (should not happen with current setup)
+    user_id = decoded_token.get('sub')
+    print(f"Warning: Using user ID as folder name - email not found in token")
+    return user_id
+
 @app.route("/api/upload", methods=['POST'])
 @token_required
 def upload_file(decoded_token): # The decoded token is passed by the decorator
@@ -189,9 +206,14 @@ def upload_file(decoded_token): # The decoded token is passed by the decorator
             print(f"Original filename: {file.filename}")
             print(f"Sanitized filename: {sanitized_filename}")
             
-            # You could use the user's ID from the token to create user-specific folders in S3
-            user_id = decoded_token.get('sub')
-            file_key = f"{user_id}/{sanitized_filename}"
+            # Use email address for cleaner, more intuitive folder structure
+            user_folder = get_user_folder_name(decoded_token)
+            if not user_folder:
+                return jsonify({'message': 'User identification not found in token'}), 400
+                
+            print(f"User folder: {user_folder}")
+            file_key = f"{user_folder}/{sanitized_filename}"
+            print(f"S3 file key: {file_key}")
 
             s3.upload_fileobj(file, S3_BUCKET_NAME, file_key)
             return jsonify({
