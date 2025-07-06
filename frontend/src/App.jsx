@@ -502,15 +502,37 @@ const AppContent = ({ user, signOut }) => {
     }
   };
 
-  // Placeholder function for email link functionality
+  // Function to open email client with pre-filled download link
   const handleEmailLink = (downloadUrl) => {
-    // This is a placeholder for future email functionality
-    // Could eventually open default email client with pre-filled subject/body
-    console.log('Email link functionality not implemented yet:', downloadUrl);
-    setUploadMessage('Email link functionality coming soon!');
-    setTimeout(() => {
-      setUploadMessage('');
-    }, 3000);
+    const subject = encodeURIComponent('File Download Link - FileShare Plus');
+    const body = encodeURIComponent(`Hi there!
+
+I've shared a file with you through FileShare Plus. You can download it using the link below:
+
+${downloadUrl}
+
+This is a secure download link that will allow you to access the file directly.
+
+Best regards!
+
+---
+Powered by FileShare Plus - Secure file sharing made simple`);
+
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+    
+    try {
+      window.open(mailtoUrl, '_blank');
+      setUploadMessage('Email client opened! Please add recipient and send.');
+      setTimeout(() => {
+        setUploadMessage('');
+      }, 4000);
+    } catch (error) {
+      console.error('Error opening email client:', error);
+      setUploadMessage('Unable to open email client. Please copy the link manually.');
+      setTimeout(() => {
+        setUploadMessage('');
+      }, 4000);
+    }
   };
 
   const onFileChange = (event) => {
@@ -661,8 +683,7 @@ const AppContent = ({ user, signOut }) => {
                 onClick={() => handleEmailLink(downloadUrl)}
                 fontSize="0.8rem"
                 padding="0.25rem 0.5rem"
-                isDisabled={true}
-                title="Coming Soon - Email sharing functionality"
+                title="Open email client to share this download link"
               >
                 Email Link
               </Button>
