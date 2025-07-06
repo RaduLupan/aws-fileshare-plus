@@ -859,6 +859,8 @@ const AppContent = ({ user, signOut }) => {
 
   // Function to open email client with pre-filled download link
   const handleEmailLink = (downloadUrl) => {
+    console.log('Email Link clicked for URL:', downloadUrl);
+    
     const subject = encodeURIComponent('File Download Link - FileShare Plus');
     const body = encodeURIComponent(`Hi there!
 
@@ -874,16 +876,34 @@ Best regards!
 Powered by FileShare Plus - Secure file sharing made simple`);
 
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+    console.log('Generated mailto URL:', mailtoUrl);
+    console.log('mailto URL length:', mailtoUrl.length);
     
     try {
-      window.open(mailtoUrl, '_blank');
-      setUploadMessage('Email client opened! Please add recipient and send.');
+      const result = window.open(mailtoUrl, '_blank');
+      console.log('window.open result:', result);
+      
+      if (result === null) {
+        console.warn('window.open returned null - trying window.location.href fallback');
+        window.location.href = mailtoUrl;
+        setUploadMessage('Email client opened via fallback! Please add recipient and send.');
+      } else {
+        console.log('Email client should have opened');
+        setUploadMessage('Email client opened! Please add recipient and send.');
+      }
+      
       setTimeout(() => {
         setUploadMessage('');
       }, 4000);
     } catch (error) {
-      console.error('Error opening email client:', error);
-      setUploadMessage('Unable to open email client. Please copy the link manually.');
+      console.error('Error with window.open, trying fallback:', error);
+      try {
+        window.location.href = mailtoUrl;
+        setUploadMessage('Email client opened via fallback! Please add recipient and send.');
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setUploadMessage('Unable to open email client. Please copy the link manually.');
+      }
       setTimeout(() => {
         setUploadMessage('');
       }, 4000);
