@@ -470,6 +470,49 @@ const AppContent = ({ user, signOut }) => {
     }
   };
 
+  // Function to copy text to clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        // Use the modern Clipboard API if available
+        await navigator.clipboard.writeText(text);
+        setUploadMessage('Download link copied to clipboard!');
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setUploadMessage('Download link copied to clipboard!');
+      }
+      // Clear the message after 3 seconds
+      setTimeout(() => {
+        setUploadMessage('');
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      setUploadMessage('Failed to copy link. Please copy manually.');
+      setTimeout(() => {
+        setUploadMessage('');
+      }, 3000);
+    }
+  };
+
+  // Placeholder function for email link functionality
+  const handleEmailLink = (downloadUrl) => {
+    // This is a placeholder for future email functionality
+    // Could eventually open default email client with pre-filled subject/body
+    console.log('Email link functionality not implemented yet:', downloadUrl);
+    setUploadMessage('Email link functionality coming soon!');
+    setTimeout(() => {
+      setUploadMessage('');
+    }, 3000);
+  };
+
   const onFileChange = (event) => {
     setFile(event.target.files[0]);
     setUploadMessage('');
@@ -580,7 +623,52 @@ const AppContent = ({ user, signOut }) => {
         </Flex>
 
         {uploadMessage && <Text marginTop="1rem">{uploadMessage}</Text>}
-        {downloadUrl && <Text as="a" href={downloadUrl} target="_blank" rel="noopener noreferrer" wordBreak="break-all">{downloadUrl}</Text>}
+        {downloadUrl && (
+          <Flex direction="column" gap="0.5rem" marginTop="1rem" padding="1rem" backgroundColor="var(--amplify-colors-background-primary)" borderRadius="8px">
+            <Text fontSize="0.9rem" fontWeight="600" color="var(--amplify-colors-font-primary)">Download Link:</Text>
+            <Flex direction="row" alignItems="center" gap="0.5rem">
+              <Text 
+                as="a" 
+                href={downloadUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                flex="1"
+                fontSize="0.8rem"
+                color="var(--amplify-colors-brand-primary-60)"
+                textDecoration="none"
+                style={{
+                  maxWidth: '200px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+                title={downloadUrl}
+              >
+                {downloadUrl}
+              </Text>
+              <Button 
+                size="small" 
+                variation="link" 
+                onClick={() => copyToClipboard(downloadUrl)}
+                fontSize="0.8rem"
+                padding="0.25rem 0.5rem"
+              >
+                Copy Link
+              </Button>
+              <Button 
+                size="small" 
+                variation="link" 
+                onClick={() => handleEmailLink(downloadUrl)}
+                fontSize="0.8rem"
+                padding="0.25rem 0.5rem"
+                isDisabled={true}
+                title="Coming Soon - Email sharing functionality"
+              >
+                Email Link
+              </Button>
+            </Flex>
+          </Flex>
+        )}
 
         {tier === 'Free' && (
           <Button onClick={handleUpgrade} marginTop="2rem" isFullWidth={true}>
