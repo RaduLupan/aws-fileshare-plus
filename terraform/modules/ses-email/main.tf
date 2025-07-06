@@ -16,13 +16,8 @@ resource "aws_ses_domain_identity" "domain" {
   domain = var.domain_name
 }
 
-# -----------------------------------------------------------------------------
-# SES Email Identity (only if domain is provided)
-# -----------------------------------------------------------------------------
-resource "aws_ses_email_identity" "email" {
-  count = var.from_email_address != null ? 1 : 0
-  email = var.from_email_address
-}
+# Note: When a domain is verified, you can send from any email address within that domain
+# No need to verify individual email addresses like noreply@domain.com
 
 # -----------------------------------------------------------------------------
 # SES Domain DKIM (only if domain is provided)

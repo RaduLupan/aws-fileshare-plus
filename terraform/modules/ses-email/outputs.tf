@@ -5,11 +5,6 @@ output "domain_identity_arn" {
   value       = var.domain_name != null ? aws_ses_domain_identity.domain[0].arn : null
 }
 
-output "email_identity_arn" {
-  description = "The ARN of the SES email identity (null if no custom domain)"
-  value       = var.from_email_address != null ? aws_ses_email_identity.email[0].arn : null
-}
-
 output "domain_verification_token" {
   description = "The domain verification token for DNS setup (null if no custom domain)"
   value       = var.domain_name != null ? aws_ses_domain_identity.domain[0].verification_token : null

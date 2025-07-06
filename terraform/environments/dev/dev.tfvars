@@ -12,6 +12,6 @@ alb_https_certificate_arn         = "arn:aws:acm:us-east-2:481509955802:certific
 cloudfront_https_certificate_arn  = "arn:aws:acm:us-east-1:481509955802:certificate/947ae640-6dbb-4fff-933e-15eae8fbb7fa" # ACM cert in us-east-1 for CloudFront
 cloudfront_viewer_protocol_policy = "redirect-to-https"                                                                   # Change to "https-only" for production
 
-# SES Email Configuration for custom domain
-ses_domain_name        = "aws.lupan.ca"
-ses_from_email_address = "noreply@aws.lupan.ca"
+# SES Email Configuration for custom domain (temporarily disabled until production access approved)
+# ses_domain_name        = "aws.lupan.ca"
+# ses_from_email_address = "noreply@aws.lupan.ca"
