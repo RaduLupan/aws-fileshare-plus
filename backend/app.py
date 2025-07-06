@@ -243,7 +243,7 @@ def get_download_link(decoded_token):
     user_groups = decoded_token.get('cognito:groups', [])
     
     if 'premium-tier' in user_groups:
-        expiration_seconds = 2592000 # 30 days
+        expiration_seconds = 604800 # 7 days (S3 maximum)
         tier = 'premium'
     else: # Default to free tier
         expiration_seconds = 259200  # 3 days
@@ -419,7 +419,7 @@ def generate_new_download_link(decoded_token):
         
         # Determine expiration time based on user's tier
         if 'premium-tier' in user_groups:
-            expiration_seconds = 2592000  # 30 days
+            expiration_seconds = 604800  # 7 days (S3 maximum)
             tier = 'premium'
         else:
             expiration_seconds = 259200   # 3 days (fallback)

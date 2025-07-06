@@ -427,6 +427,285 @@ const CustomAuth = ({ onAuthenticated }) => {
 };
 
 // This is the inner component that will be rendered ONLY after a successful login.
+// Premium File Explorer Component
+const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
+  const [files, setFiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [file, setFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Load files on component mount
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  const loadFiles = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const token = await getJwtToken();
+      if (!token) {
+        setError('Authentication error. Please sign in again.');
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const response = await fetch(`${apiUrl}/api/files`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to load files');
+      }
+
+      setFiles(data.files || []);
+      setMessage(`Found ${data.total_count} files`);
+      setTimeout(() => setMessage(''), 3000);
+      
+    } catch (error) {
+      console.error('Error loading files:', error);
+      setError(error.message || 'Failed to load files');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+
+    setIsUploading(true);
+    setMessage('Uploading...');
+    setError('');
+
+    try {
+      const token = await getJwtToken();
+      if (!token) {
+        setError('Authentication error. Please sign in again.');
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const uploadData = await uploadResponse.json();
+      
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.message || 'Upload failed');
+      }
+
+      setMessage('File uploaded successfully!');
+      setFile(null);
+      
+      // Reload files to show the new upload
+      setTimeout(() => {
+        loadFiles();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setError(error.message || 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const generateNewLink = async (fileKey) => {
+    try {
+      const token = await getJwtToken();
+      if (!token) {
+        setError('Authentication error. Please sign in again.');
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const response = await fetch(`${apiUrl}/api/files/new-link`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ file_key: fileKey })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate new link');
+      }
+
+      // Copy link to clipboard
+      await navigator.clipboard.writeText(data.download_url);
+      setMessage(`New download link generated and copied to clipboard! (Expires in ${data.expires_in_days} days)`);
+      setTimeout(() => setMessage(''), 5000);
+
+    } catch (error) {
+      console.error('Error generating new link:', error);
+      setError(error.message || 'Failed to generate new link');
+    }
+  };
+
+  const deleteFile = async (fileKey, filename) => {
+    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = await getJwtToken();
+      if (!token) {
+        setError('Authentication error. Please sign in again.');
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const response = await fetch(`${apiUrl}/api/files/${encodeURIComponent(fileKey)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete file');
+      }
+
+      setMessage(`File "${filename}" deleted successfully!`);
+      setTimeout(() => setMessage(''), 3000);
+      
+      // Reload files to reflect the deletion
+      loadFiles();
+
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      setError(error.message || 'Failed to delete file');
+    }
+  };
+
+  return (
+    <Flex direction="column" alignItems="center" padding="2rem">
+      <Card style={{ maxWidth: '800px', width: '100%', padding: '2rem' }}>
+        <Flex direction="row" justifyContent="space-between" alignItems="center" marginBottom="2rem">
+          <Heading level={1}>Premium File Manager</Heading>
+          <Button onClick={signOut} variation="primary">Sign Out</Button>
+        </Flex>
+
+        <Text marginBottom="1rem">
+          Welcome {user?.username}! You have <strong>{tier}</strong> tier access.
+        </Text>
+
+        {/* Upload Section */}
+        <Card variation="outlined" padding="1.5rem" marginBottom="2rem">
+          <Heading level={3} marginBottom="1rem">Upload New File</Heading>
+          <form onSubmit={handleFileUpload}>
+            <Flex direction="row" alignItems="end" gap="1rem">
+              <Flex direction="column" flex="1">
+                <Text fontWeight="600" marginBottom="0.5rem">Select File:</Text>
+                <input
+                  type="file"
+                  onChange={(e) => setFile(e.target.files[0])}
+                  style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+              </Flex>
+              <Button 
+                type="submit" 
+                isLoading={isUploading}
+                isDisabled={!file}
+                variation="primary"
+              >
+                Upload
+              </Button>
+            </Flex>
+          </form>
+        </Card>
+
+        {/* Messages */}
+        {error && (
+          <Text color="red" marginBottom="1rem" fontWeight="600">{error}</Text>
+        )}
+        {message && (
+          <Text color="green" marginBottom="1rem" fontWeight="600">{message}</Text>
+        )}
+
+        {/* Files Section */}
+        <Card variation="outlined" padding="1.5rem">
+          <Flex direction="row" justifyContent="space-between" alignItems="center" marginBottom="1rem">
+            <Heading level={3}>Your Files</Heading>
+            <Button onClick={loadFiles} variation="link" isLoading={isLoading}>
+              Refresh
+            </Button>
+          </Flex>
+
+          {isLoading && <Text>Loading files...</Text>}
+
+          {!isLoading && files.length === 0 && (
+            <Text color="gray">No files uploaded yet. Upload your first file above!</Text>
+          )}
+
+          {!isLoading && files.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #eee' }}>
+                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>File Name</th>
+                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Size</th>
+                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Upload Date</th>
+                    <th style={{ textAlign: 'center', padding: '0.75rem', fontWeight: '600' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {files.map((file, index) => (
+                    <tr key={file.key} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '0.75rem' }}>
+                        <Text fontWeight="500">{file.filename}</Text>
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <Text>{file.size_display}</Text>
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <Text>{file.upload_date}</Text>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <Flex direction="row" justifyContent="center" gap="0.5rem">
+                          <Button 
+                            size="small" 
+                            variation="primary"
+                            onClick={() => generateNewLink(file.key)}
+                          >
+                            New Link
+                          </Button>
+                          <Button 
+                            size="small" 
+                            variation="destructive"
+                            onClick={() => deleteFile(file.key, file.filename)}
+                          >
+                            Delete
+                          </Button>
+                        </Flex>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </Card>
+    </Flex>
+  );
+};
+
 const AppContent = ({ user, signOut }) => {
   const [file, setFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState('');
@@ -469,6 +748,11 @@ const AppContent = ({ user, signOut }) => {
       return null;
     }
   };
+
+  // Show Premium File Explorer for Premium users
+  if (tier === 'Premium') {
+    return <PremiumFileExplorer signOut={signOut} user={user} tier={tier} getJwtToken={getJwtToken} />;
+  }
 
   // Function to copy text to clipboard
   const copyToClipboard = async (text) => {
