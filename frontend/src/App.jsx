@@ -687,6 +687,13 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
                           </Button>
                           <Button 
                             size="small" 
+                            variation="warning"
+                            onClick={() => emailLink(file.key, file.filename)}
+                          >
+                            📧 Email Link
+                          </Button>
+                          <Button 
+                            size="small" 
                             variation="destructive"
                             onClick={() => deleteFile(file.key, file.filename)}
                           >
