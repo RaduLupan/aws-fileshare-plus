@@ -24,6 +24,7 @@ def init_database():
                     full_url TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP,
+                    expires_in_days INTEGER DEFAULT 7,
                     click_count INTEGER DEFAULT 0,
                     created_by_user VARCHAR(255),
                     file_key VARCHAR(255),
@@ -45,8 +46,34 @@ def init_database():
             conn.commit()
             logger.info("Database initialized successfully")
             
+            # Run migrations
+            migrate_database(conn)
+            
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+        raise
+
+def migrate_database(conn):
+    """Handle database migrations for schema changes"""
+    try:
+        cursor = conn.cursor()
+        
+        # Check if expires_in_days column exists
+        cursor.execute("PRAGMA table_info(url_mappings)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'expires_in_days' not in columns:
+            logger.info("Adding expires_in_days column to url_mappings table")
+            cursor.execute('ALTER TABLE url_mappings ADD COLUMN expires_in_days INTEGER DEFAULT 7')
+            
+            # Update existing records to have default 7-day expiration
+            cursor.execute('UPDATE url_mappings SET expires_in_days = 7 WHERE expires_in_days IS NULL')
+            
+            conn.commit()
+            logger.info("Migration completed: expires_in_days column added")
+        
+    except Exception as e:
+        logger.error(f"Database migration failed: {e}")
         raise
 
 @contextmanager

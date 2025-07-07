@@ -380,6 +380,8 @@ def list_user_files(decoded_token):
         )
         
         files = []
+        user_email = decoded_token.get('email', 'unknown')
+        
         for obj in response.get('Contents', []):
             # Skip the folder itself (empty key)
             if obj['Key'] == f"{user_folder}/":
@@ -397,14 +399,47 @@ def list_user_files(decoded_token):
             else:
                 size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
             
-            files.append({
+            # Get short URL info for this file
+            short_url_info = None
+            try:
+                # Get user's URLs and find the one for this file
+                user_urls = get_user_urls(user_email, limit=1000)  # Get more URLs to find the right one
+                for url_data in user_urls:
+                    if url_data.get('file_key') == obj['Key']:
+                        short_url_info = url_data
+                        break
+            except Exception as url_error:
+                print(f"Error getting short URL info for {obj['Key']}: {url_error}")
+            
+            file_data = {
                 'key': obj['Key'],
                 'filename': filename,
                 'size_bytes': size_bytes,
                 'size_display': size_display,
                 'last_modified': obj['LastModified'].isoformat(),
                 'upload_date': obj['LastModified'].strftime('%b %d, %Y')
-            })
+            }
+            
+            # Add short URL information if available
+            if short_url_info:
+                file_data.update({
+                    'short_code': short_url_info.get('short_code'),
+                    'click_count': short_url_info.get('click_count', 0),
+                    'url_created_at': short_url_info.get('created_at'),
+                    'expires_at': short_url_info.get('expires_at'),
+                    'expires_in_days': short_url_info.get('expires_in_days', 7)
+                })
+            else:
+                # No short URL exists for this file yet
+                file_data.update({
+                    'short_code': None,
+                    'click_count': 0,
+                    'url_created_at': None,
+                    'expires_at': None,
+                    'expires_in_days': None
+                })
+            
+            files.append(file_data)
         
         # Sort files by last modified (newest first)
         files.sort(key=lambda x: x['last_modified'], reverse=True)
@@ -436,6 +471,18 @@ def generate_new_download_link(decoded_token):
         return jsonify({'message': 'Missing file_key parameter'}), 400
     
     file_key = data['file_key']
+    
+    # Get expiration_days from request, default to 3 days, validate range 1-7
+    expiration_days = data.get('expiration_days', 3)
+    try:
+        expiration_days = int(expiration_days)
+        if expiration_days < 1 or expiration_days > 7:
+            expiration_days = 3  # Default to 3 days if invalid
+    except (ValueError, TypeError):
+        expiration_days = 3  # Default to 3 days if invalid
+    
+    print(f"New link request: file_key={file_key}, expiration_days={expiration_days}")
+    
     user_folder = get_user_folder_name(decoded_token)
     
     # Security check: ensure file belongs to the authenticated user
@@ -448,13 +495,11 @@ def generate_new_download_link(decoded_token):
         # Check if file exists in S3
         s3.head_object(Bucket=S3_BUCKET_NAME, Key=file_key)
         
-        # Determine expiration time based on user's tier
-        if 'premium-tier' in user_groups:
-            expiration_seconds = 604800  # 7 days (S3 maximum)
-            tier = 'premium'
-        else:
-            expiration_seconds = 259200   # 3 days (fallback)
-            tier = 'free'
+        # Use user-specified expiration days (1-7 days for Premium)
+        expiration_seconds = expiration_days * 86400  # Convert days to seconds
+        tier = 'premium'
+        
+        print(f"Generating presigned URL with {expiration_days} days ({expiration_seconds} seconds) expiration")
         
         # Generate new presigned URL
         presigned_url = s3.generate_presigned_url(
@@ -472,7 +517,7 @@ def generate_new_download_link(decoded_token):
             user_email=user_email,
             file_key=file_key,
             filename=filename,
-            expires_in_days=expiration_seconds // 86400  # Convert seconds to days
+            expires_in_days=expiration_days  # Use user-specified days
         )
         
         # Build short URL using CloudFront domain

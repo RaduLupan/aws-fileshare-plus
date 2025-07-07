@@ -30,56 +30,56 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 
 ## 🚀 **Implementation Phases**
 
-## **Phase 1: Backend Foundation** ⏳
+## **Phase 1: Backend Foundation** ✅
 
 ### **1.1 Database Enhancement**
-- [ ] **Task**: Update SQLite schema for expiration tracking
-- [ ] **Details**: 
+- [x] **Task**: Update SQLite schema for expiration tracking
+- [x] **Details**: 
   ```sql
-  ALTER TABLE short_urls ADD COLUMN expires_in_days INTEGER DEFAULT 7;
-  UPDATE short_urls SET expires_in_days = 7 WHERE expires_in_days IS NULL;
+  ALTER TABLE url_mappings ADD COLUMN expires_in_days INTEGER DEFAULT 7;
+  UPDATE url_mappings SET expires_in_days = 7 WHERE expires_in_days IS NULL;
   ```
-- [ ] **Files**: `backend/database.py`, `backend/url_shortener.py`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `backend/database.py`, `backend/url_shortener.py`
+- [x] **Status**: ✅ Complete
 
 ### **1.2 URL Shortener Updates**
-- [ ] **Task**: Modify `create_short_url()` function
-- [ ] **Details**: Accept and store `expires_in_days` parameter
-- [ ] **Files**: `backend/url_shortener.py`
-- [ ] **Status**: ❌ Not Started
+- [x] **Task**: Modify `create_short_url()` function
+- [x] **Details**: Accept and store `expires_in_days` parameter
+- [x] **Files**: `backend/url_shortener.py`
+- [x] **Status**: ✅ Complete
 
 ### **1.3 API Endpoint: `/api/files/new-link`**
-- [ ] **Task**: Accept `expiration_days` parameter
-- [ ] **Request Format**:
+- [x] **Task**: Accept `expiration_days` parameter
+- [x] **Request Format**:
   ```json
   {
     "file_key": "user@email.com/filename.pdf",
     "expiration_days": 3
   }
   ```
-- [ ] **Validation**: Ensure 1-7 day range, default to 3 days
-- [ ] **Files**: `backend/app.py`
-- [ ] **Status**: ❌ Not Started
+- [x] **Validation**: Ensure 1-7 day range, default to 3 days
+- [x] **Files**: `backend/app.py`
+- [x] **Status**: ✅ Complete
 
 ### **1.4 API Endpoint: `/api/files`**
-- [ ] **Task**: Include expiration data in response
-- [ ] **Response Format**:
+- [x] **Task**: Include expiration data in response
+- [x] **Response Format**:
   ```json
   {
     "files": [
       {
-        "file_name": "filename.pdf",
-        "size": "3.8 MB", 
+        "filename": "filename.pdf",
+        "size_display": "3.8 MB", 
         "upload_date": "Jul 07, 2025",
-        "expires_on": "3 days",
-        "expires_on_raw": 3,
+        "expires_in_days": 3,
+        "expires_at": "2025-07-10T12:00:00",
         "short_code": "aBc123"
       }
     ]
   }
   ```
-- [ ] **Files**: `backend/app.py`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `backend/app.py`
+- [x] **Status**: ✅ Complete
 
 ---
 

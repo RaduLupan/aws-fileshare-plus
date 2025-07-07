@@ -98,9 +98,9 @@ def create_short_url(full_url, user_email=None, file_key=None, filename=None, ex
             # Insert new mapping
             cursor.execute('''
                 INSERT INTO url_mappings 
-                (short_code, full_url, created_by_user, file_key, filename, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (short_code, full_url, user_email, file_key, filename, expires_at))
+                (short_code, full_url, created_by_user, file_key, filename, expires_at, expires_in_days)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (short_code, full_url, user_email, file_key, filename, expires_at, expires_in_days))
             
             conn.commit()
             
@@ -136,7 +136,7 @@ def get_full_url(short_code):
             # Get URL and check expiration
             cursor.execute('''
                 SELECT full_url, created_by_user, file_key, filename, 
-                       expires_at, click_count, created_at
+                       expires_at, expires_in_days, click_count, created_at
                 FROM url_mappings 
                 WHERE short_code = ?
                 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
@@ -161,6 +161,7 @@ def get_full_url(short_code):
                 'file_key': row['file_key'],
                 'filename': row['filename'],
                 'expires_at': row['expires_at'],
+                'expires_in_days': row['expires_in_days'],
                 'click_count': row['click_count'] + 1,  # Return updated count
                 'created_at': row['created_at']
             }
@@ -188,7 +189,7 @@ def get_user_urls(user_email, limit=100):
             
             cursor.execute('''
                 SELECT short_code, full_url, file_key, filename, 
-                       click_count, created_at, expires_at
+                       click_count, created_at, expires_at, expires_in_days
                 FROM url_mappings 
                 WHERE created_by_user = ?
                 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
