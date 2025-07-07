@@ -36,3 +36,64 @@
     transform: rotate(360deg);
   }
 }
+
+/* Premium File Explorer Styles */
+.premium-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.premium-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.premium-table td {
+  padding: 12px;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: middle;
+}
+
+.premium-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.expiration-valid {
+  color: #057a52;
+  font-weight: 500;
+}
+
+.expiration-expired {
+  color: #d73502;
+  font-weight: 600;
+}
+
+.expiration-none {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.new-link-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expiration-select {
+  padding: 4px 6px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 12px;
+  width: 50px;
+  background-color: white;
+}
+
+.expiration-select:focus {
+  outline: none;
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
+}

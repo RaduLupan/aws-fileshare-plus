@@ -524,7 +524,70 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
     }
   };
 
-  const generateNewLink = async (fileKey) => {
+  // Helper function to calculate expiration status
+  const getExpirationInfo = (file) => {
+    if (!file.short_code || !file.expires_at) {
+      return { text: 'No active link', color: 'gray', isExpired: null };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(file.expires_at);
+    const diffTime = expiresAt - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffTime <= 0) {
+      const daysAgo = Math.abs(diffDays);
+      return {
+        text: daysAgo === 0 ? 'Expired today' : `${daysAgo} day${daysAgo === 1 ? '' : 's'} ago`,
+        color: '#d73502', // Red for expired
+        isExpired: true
+      };
+    } else {
+      return {
+        text: diffDays === 1 ? '1 day' : `${diffDays} days`,
+        color: '#057a52', // Green for valid
+        isExpired: false
+      };
+    }
+  };
+
+  // Component for the New Link dropdown
+  const NewLinkDropdown = ({ fileKey, onGenerateLink }) => {
+    const [selectedDays, setSelectedDays] = useState(3);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerateLink = async () => {
+      setIsGenerating(true);
+      await onGenerateLink(fileKey, selectedDays);
+      setIsGenerating(false);
+    };
+
+    return (
+      <div className="new-link-dropdown">
+        <select
+          value={selectedDays}
+          onChange={(e) => setSelectedDays(parseInt(e.target.value))}
+          className="expiration-select"
+        >
+          <option value={1}>1</option>
+          <option value={3}>3</option>
+          <option value={5}>5</option>
+          <option value={7}>7</option>
+        </select>
+        <Button
+          size="small"
+          variation="primary"
+          onClick={handleGenerateLink}
+          isLoading={isGenerating}
+          style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
+        >
+          New Link
+        </Button>
+      </div>
+    );
+  };
+
+  const generateNewLink = async (fileKey, expirationDays = 3) => {
     try {
       const token = await getJwtToken();
       if (!token) {
@@ -539,7 +602,10 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ file_key: fileKey })
+        body: JSON.stringify({ 
+          file_key: fileKey,
+          expiration_days: expirationDays
+        })
       });
 
       const data = await response.json();
@@ -552,6 +618,9 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
       await navigator.clipboard.writeText(data.download_url);
       setMessage(`New download link generated and copied to clipboard! (Expires in ${data.expires_in_days} days)`);
       setTimeout(() => setMessage(''), 5000);
+
+      // Reload files to update the expiration info
+      loadFiles();
 
     } catch (error) {
       console.error('Error generating new link:', error);
@@ -603,7 +672,7 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
         return;
       }
 
-      // Generate a new download link first
+      // Generate a new download link first (with default 3 days expiration)
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
       const response = await fetch(`${apiUrl}/api/files/new-link`, {
         method: 'POST',
@@ -611,7 +680,10 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ file_key: fileKey })
+        body: JSON.stringify({ 
+          file_key: fileKey,
+          expiration_days: 3
+        })
       });
 
       const data = await response.json();
@@ -656,6 +728,9 @@ This message was sent using FileShare Plus Premium. Experience secure file shari
         window.open(mailtoUrl, '_blank');
         setMessage(`Email client opened with download link for "${filename}"`);
         setTimeout(() => setMessage(''), 4000);
+        
+        // Reload files to update the expiration info
+        loadFiles();
       } catch (emailError) {
         console.error('Error opening email client:', emailError);
         // Fallback: copy to clipboard
@@ -735,55 +810,67 @@ This message was sent using FileShare Plus Premium. Experience secure file shari
 
           {!isLoading && files.length > 0 && (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="premium-table">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #eee' }}>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>File Name</th>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Size</th>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Upload Date</th>
-                    <th style={{ textAlign: 'center', padding: '0.75rem', fontWeight: '600' }}>Actions</th>
+                  <tr>
+                    <th>File Name</th>
+                    <th>Size</th>
+                    <th>Upload Date</th>
+                    <th>Expires On</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {files.map((file, index) => (
-                    <tr key={file.key} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '0.75rem' }}>
-                        <Text fontWeight="500">{file.filename}</Text>
-                      </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <Text>{file.size_display}</Text>
-                      </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <Text>{file.upload_date}</Text>
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <Flex direction="row" justifyContent="center" gap="0.5rem">
-                          <Button 
-                            size="small" 
-                            variation="primary"
-                            onClick={() => generateNewLink(file.key)}
+                  {files.map((file, index) => {
+                    const expirationInfo = getExpirationInfo(file);
+                    return (
+                      <tr key={file.key}>
+                        <td>
+                          <Text fontWeight="500">{file.filename}</Text>
+                        </td>
+                        <td>
+                          <Text>{file.size_display}</Text>
+                        </td>
+                        <td>
+                          <Text>{file.upload_date}</Text>
+                        </td>
+                        <td>
+                          <Text 
+                            className={
+                              expirationInfo.isExpired === true ? 'expiration-expired' : 
+                              expirationInfo.isExpired === false ? 'expiration-valid' : 
+                              'expiration-none'
+                            }
                           >
-                            New Link
-                          </Button>
-                          <Button 
-                            size="small" 
-                            variation="warning"
-                            onClick={() => emailLink(file.key, file.filename)}
-                            title="Open email client to share this download link"
-                          >
-                            📧 Email Link
-                          </Button>
-                          <Button 
-                            size="small" 
-                            variation="destructive"
-                            onClick={() => deleteFile(file.key, file.filename)}
-                          >
-                            Delete
-                          </Button>
-                        </Flex>
-                      </td>
-                    </tr>
-                  ))}
+                            {expirationInfo.text}
+                          </Text>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Flex direction="row" justifyContent="center" gap="0.5rem">
+                            <NewLinkDropdown 
+                              fileKey={file.key} 
+                              onGenerateLink={generateNewLink}
+                            />
+                            <Button 
+                              size="small" 
+                              variation="warning"
+                              onClick={() => emailLink(file.key, file.filename)}
+                              title="Open email client to share this download link"
+                            >
+                              📧 Email Link
+                            </Button>
+                            <Button 
+                              size="small" 
+                              variation="destructive"
+                              onClick={() => deleteFile(file.key, file.filename)}
+                            >
+                              Delete
+                            </Button>
+                          </Flex>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

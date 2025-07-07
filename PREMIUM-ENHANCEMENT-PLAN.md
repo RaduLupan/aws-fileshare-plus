@@ -83,21 +83,21 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 
 ---
 
-## **Phase 2: Frontend UI Enhancement** ⏳
+## **Phase 2: Frontend UI Enhancement** ✅
 
 ### **2.1 File Table Structure Update**
-- [ ] **Task**: Add "Expires On" column to Premium File Explorer
-- [ ] **Layout Change**: 
+- [x] **Task**: Add "Expires On" column to Premium File Explorer
+- [x] **Layout Change**: 
   ```
   Before: File Name | Size | Upload Date | Actions
   After:  File Name | Size | Upload Date | Expires On | Actions
   ```
-- [ ] **Files**: `frontend/src/App.jsx`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.jsx`
+- [x] **Status**: ✅ Complete
 
 ### **2.2 New Link Dropdown Component**
-- [ ] **Task**: Replace simple "New Link" button with dropdown
-- [ ] **UI Options**:
+- [x] **Task**: Replace simple "New Link" button with dropdown
+- [x] **UI Options**:
   ```
   [New Link ▼] → Dropdown:
   ┌─────────────────┐
@@ -107,68 +107,75 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
   │ ○ 7 days        │
   └─────────────────┘
   ```
-- [ ] **Files**: `frontend/src/App.jsx`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.jsx`
+- [x] **Status**: ✅ Complete
 
 ### **2.3 Color Coding CSS**
-- [ ] **Task**: Add CSS classes for expiration status
-- [ ] **Classes**:
+- [x] **Task**: Add CSS classes for expiration status
+- [x] **Classes**:
   ```css
-  .expires-valid { color: green; }
-  .expires-expired { color: red; }
+  .expiration-valid { color: #057a52; }
+  .expiration-expired { color: #d73502; }
+  .expiration-none { color: #6c757d; }
   ```
-- [ ] **Files**: `frontend/src/App.css` or inline styles
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.css`
+- [x] **Status**: ✅ Complete
 
 ---
 
-## **Phase 3: Integration & Logic** ⏳
+## **Phase 3: Integration & Logic** ✅
 
 ### **3.1 Expiration Calculation Logic**
-- [ ] **Task**: Implement client-side expiration calculation
-- [ ] **Function**: 
+- [x] **Task**: Implement client-side expiration calculation
+- [x] **Function**: 
   ```javascript
-  function calculateExpiresOn(shortUrl) {
-    const createdDate = new Date(shortUrl.created_at);
-    const expirationDate = new Date(createdDate.getTime() + (shortUrl.expires_in_days * 24 * 60 * 60 * 1000));
-    const now = new Date();
-    const diffDays = Math.ceil((expirationDate - now) / (24 * 60 * 60 * 1000));
+  function getExpirationInfo(file) {
+    if (!file.short_code || !file.expires_at) {
+      return { text: 'No active link', color: 'gray', isExpired: null };
+    }
     
-    if (diffDays > 0) {
+    const now = new Date();
+    const expiresAt = new Date(file.expires_at);
+    const diffTime = expiresAt - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffTime <= 0) {
+      const daysAgo = Math.abs(diffDays);
       return {
-        text: `${diffDays} day${diffDays > 1 ? 's' : ''}`,
-        isExpired: false
+        text: daysAgo === 0 ? 'Expired today' : `${daysAgo} day${daysAgo === 1 ? '' : 's'} ago`,
+        color: '#d73502',
+        isExpired: true
       };
     } else {
-      const expiredDays = Math.abs(diffDays);
       return {
-        text: `${expiredDays} day${expiredDays > 1 ? 's' : ''} ago`,
-        isExpired: true
+        text: diffDays === 1 ? '1 day' : `${diffDays} days`,
+        color: '#057a52',
+        isExpired: false
       };
     }
   }
   ```
-- [ ] **Files**: `frontend/src/App.jsx`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.jsx`
+- [x] **Status**: ✅ Complete
 
 ### **3.2 Real-time UI Updates**
-- [ ] **Task**: Update "Expires On" immediately after new link generation
-- [ ] **Behavior**: 
+- [x] **Task**: Update "Expires On" immediately after new link generation
+- [x] **Behavior**: 
   - User selects expiration from dropdown
   - New link generated successfully
   - "Expires On" column updates instantly
   - Color coding applied correctly
-- [ ] **Files**: `frontend/src/App.jsx`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.jsx`
+- [x] **Status**: ✅ Complete
 
 ### **3.3 State Management**
-- [ ] **Task**: Manage dropdown state and file list updates
-- [ ] **Details**: 
+- [x] **Task**: Manage dropdown state and file list updates
+- [x] **Details**: 
   - Track selected expiration days
   - Update file list after successful link generation
   - Handle loading states during API calls
-- [ ] **Files**: `frontend/src/App.jsx`
-- [ ] **Status**: ❌ Not Started
+- [x] **Files**: `frontend/src/App.jsx`
+- [x] **Status**: ✅ Complete
 
 ---
 
