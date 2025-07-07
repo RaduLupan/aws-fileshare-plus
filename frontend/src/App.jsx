@@ -861,19 +861,14 @@ const AppContent = ({ user, signOut }) => {
   const handleEmailLink = (downloadUrl) => {
     console.log('Email Link clicked for URL:', downloadUrl);
     
-    const subject = encodeURIComponent('File Download Link - FileShare Plus');
+    const subject = encodeURIComponent('File shared with you - FileShare Plus');
     const body = encodeURIComponent(`Hi there!
 
-I've shared a file with you through FileShare Plus. You can download it using the link below:
+I've shared a file with you. Please copy and paste this download link in your browser:
 
 ${downloadUrl}
 
-This is a secure download link that will allow you to access the file directly.
-
-Best regards!
-
----
-Powered by FileShare Plus - Secure file sharing made simple`);
+Best regards!`);
 
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
     console.log('Generated mailto URL:', mailtoUrl);
