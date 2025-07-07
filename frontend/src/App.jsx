@@ -977,9 +977,12 @@ This message was sent using FileShare Plus. Experience secure file sharing today
       const fileName = uploadData.file_name;
       
       // Simple approach: just pass the filename directly (already sanitized by backend)
+      console.log('Making download link request with token:', token ? `${token.substring(0, 20)}...` : 'null');
+      console.log('Download link URL:', `${apiUrl}/api/get-download-link?file_name=${encodeURIComponent(fileName)}`);
       const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodeURIComponent(fileName)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      console.log('Download response status:', downloadResponse.status);
       
       const downloadData = await downloadResponse.json();
       
