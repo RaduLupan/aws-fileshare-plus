@@ -34,8 +34,6 @@ const CustomAuth = ({ onAuthenticated }) => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showResetCodeForm, setShowResetCodeForm] = useState(false);  const handleSignUp = async (e) => {
     e.preventDefault();
-    console.log('=== CUSTOM SIGNUP FUNCTION CALLED ===');
-    console.log('Email:', email);
     
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -45,7 +43,6 @@ const CustomAuth = ({ onAuthenticated }) => {
     setIsLoading(true);
     setError('');      try {
       // Use email directly as username since alias_attributes = ["email"] is enabled
-      console.log('Using email as username:', email);
       setGeneratedUsername(email); // Store email as the "generated" username for consistency
       
       const result = await signUp({
@@ -57,17 +54,14 @@ const CustomAuth = ({ onAuthenticated }) => {
         autoSignIn: {
           enabled: true,
         }
-      });console.log('SignUp successful:', result);
+      });
       
       // Check if auto sign-in worked
       if (result.isSignUpComplete && result.nextStep?.signInStep === 'DONE') {
-        console.log('Auto sign-in successful!');
         onAuthenticated();      } else if (result.isSignUpComplete) {
-        console.log('Signup completed successfully! User can now sign in.');
         setError(`Account created successfully! You can sign in with your email: ${email}`);
         setIsSignUp(false); // Switch to sign-in mode
       } else {
-        console.log('Signup requires additional steps:', result.nextStep);
         setError('Account created! Please check the console for next steps.');
         setIsSignUp(false);
       }
@@ -633,8 +627,6 @@ Best regards!`;
       // Create mailto URL
       const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
-      console.log('Generated mailto URL:', mailtoUrl);
-      
       // Use the same method as free tier
       try {
         window.open(mailtoUrl, '_blank');
@@ -809,12 +801,8 @@ const AppContent = ({ user, signOut }) => {
   // Function to get JWT token for backend requests
   const getJwtToken = async () => {
     try {
-      console.log('=== GETTING JWT TOKEN ===');
       const authSession = await fetchAuthSession();
-      console.log('Auth session:', authSession);
       const token = authSession?.tokens?.idToken?.toString();
-      console.log('JWT token retrieved:', token ? 'Token found' : 'No token');
-      console.log('JWT token preview:', token ? token.substring(0, 50) + '...' : 'null');
       return token;
     } catch (error) {
       console.error('Error getting JWT token:', error);
@@ -861,8 +849,6 @@ const AppContent = ({ user, signOut }) => {
 
   // Function to open email client with pre-filled download link
   const handleEmailLink = (downloadUrl) => {
-    console.log('Email Link clicked for URL:', downloadUrl);
-    
     const subject = encodeURIComponent('File shared with you - FileShare Plus');
     const body = encodeURIComponent(`Hi there!
 
@@ -873,34 +859,16 @@ ${downloadUrl}
 Best regards!`);
 
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
-    console.log('Generated mailto URL:', mailtoUrl);
-    console.log('mailto URL length:', mailtoUrl.length);
     
     try {
-      const result = window.open(mailtoUrl, '_blank');
-      console.log('window.open result:', result);
-      
-      if (result === null) {
-        console.warn('window.open returned null - trying window.location.href fallback');
-        window.location.href = mailtoUrl;
-        setUploadMessage('Email client opened via fallback! Please add recipient and send.');
-      } else {
-        console.log('Email client should have opened');
-        setUploadMessage('Email client opened! Please add recipient and send.');
-      }
-      
+      window.open(mailtoUrl, '_blank');
+      setUploadMessage('Email client opened! Please add recipient and send.');
       setTimeout(() => {
         setUploadMessage('');
       }, 4000);
     } catch (error) {
-      console.error('Error with window.open, trying fallback:', error);
-      try {
-        window.location.href = mailtoUrl;
-        setUploadMessage('Email client opened via fallback! Please add recipient and send.');
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-        setUploadMessage('Unable to open email client. Please copy the link manually.');
-      }
+      console.error('Error opening email client:', error);
+      setUploadMessage('Unable to open email client. Please copy the link manually.');
       setTimeout(() => {
         setUploadMessage('');
       }, 4000);
@@ -914,9 +882,7 @@ Best regards!`);
   };
 
   const onFileUpload = async () => {
-    console.log('=== FILE UPLOAD FUNCTION CALLED ===');
     if (!file) {
-      console.log('No file selected');
       return;
     }
 
@@ -924,38 +890,30 @@ Best regards!`);
     setUploadMessage('Uploading...');
     setDownloadUrl('');
 
-    console.log('Getting JWT token...');
     const token = await getJwtToken();
-    console.log('Token result:', token ? 'Token received' : 'No token received');
     if (!token) {
       setUploadMessage('Authentication error. Please sign in again.');
       setIsUploading(false);
       return;
     }    try {
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
-      console.log('API URL:', apiUrl);
-      console.log('Preparing FormData with file:', file.name);
       
       const formData = new FormData();
       formData.append('file', file);
 
-      console.log('Making upload request with token:', token.substring(0, 20) + '...');
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
-      console.log('Upload response status:', uploadResponse.status);
       const uploadData = await uploadResponse.json();
-      console.log('Upload response data:', uploadData);
       
       if (!uploadResponse.ok) throw new Error(uploadData.message || 'Upload failed');
 
       setUploadMessage('Upload successful! Generating download link...');
       
       const fileName = uploadData.file_name;
-      console.log('File name from upload response:', fileName);
       
       // Simple approach: just pass the filename directly (already sanitized by backend)
       const downloadResponse = await fetch(`${apiUrl}/api/get-download-link?file_name=${encodeURIComponent(fileName)}`, {
@@ -1055,10 +1013,9 @@ Best regards!`);
                 onClick={() => handleEmailLink(downloadUrl)}
                 fontSize="0.8rem"
                 padding="0.25rem 0.5rem"
-                title="Open email client to share this download link (Currently limited by URL length - use Copy Link as workaround)"
-                style={{ opacity: 0.6 }}
+                title="Open email client to share this download link"
               >
-                Email Link (Issue)
+                Email Link
               </Button>
             </Flex>
           </Flex>
