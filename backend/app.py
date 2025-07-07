@@ -1,6 +1,6 @@
 # backend/app.py
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 import boto3
 import os
@@ -11,6 +11,8 @@ from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
+from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -250,20 +252,40 @@ def get_download_link(decoded_token):
         tier = 'free'
 
     try:
-        url = s3.generate_presigned_url(
+        # Generate presigned URL first
+        presigned_url = s3.generate_presigned_url(
             'get_object',
             Params={'Bucket': S3_BUCKET_NAME, 'Key': file_name},
             ExpiresIn=expiration_seconds
         )
         print(f"Generated presigned URL for S3 key: {file_name}")
+        
+        # Create short URL for the presigned URL
+        user_email = decoded_token.get('email', 'unknown')
+        filename = file_name.split('/')[-1] if '/' in file_name else file_name
+        
+        short_url_result = create_short_url(
+            full_url=presigned_url,
+            user_email=user_email,
+            file_key=file_name,
+            filename=filename,
+            expires_in_days=expiration_seconds // 86400  # Convert seconds to days
+        )
+        
+        # Build short URL
+        base_url = request.host_url.rstrip('/')
+        short_url = f"{base_url}/s/{short_url_result['short_code']}"
+        
         return jsonify({
-            'download_url': url,
+            'download_url': short_url,  # Return short URL instead of long presigned URL
+            'short_code': short_url_result['short_code'],
             'tier': tier,
-            'expires_in_seconds': expiration_seconds
+            'expires_in_seconds': expiration_seconds,
+            'message': 'Short download URL created'
         })
     except Exception as e:
-        print(f"Error generating presigned URL for key '{file_name}': {e}")
-        return jsonify({'message': f'Could not generate presigned URL: {e}'}), 500
+        print(f"Error generating download URL for key '{file_name}': {e}")
+        return jsonify({'message': f'Could not generate download URL: {e}'}), 500
 
 # --- NEW: Endpoint to handle tier upgrade ---
 @app.route("/api/upgrade", methods=['POST'])
@@ -426,19 +448,37 @@ def generate_new_download_link(decoded_token):
             tier = 'free'
         
         # Generate new presigned URL
-        url = s3.generate_presigned_url(
+        presigned_url = s3.generate_presigned_url(
             'get_object',
             Params={'Bucket': S3_BUCKET_NAME, 'Key': file_key},
             ExpiresIn=expiration_seconds
         )
         
-        print(f"Generated new presigned URL for: {file_key}")
+        # Create short URL for the presigned URL
+        user_email = decoded_token.get('email', 'unknown')
+        filename = file_key.split('/')[-1] if '/' in file_key else file_key
+        
+        short_url_result = create_short_url(
+            full_url=presigned_url,
+            user_email=user_email,
+            file_key=file_key,
+            filename=filename,
+            expires_in_days=expiration_seconds // 86400  # Convert seconds to days
+        )
+        
+        # Build short URL
+        base_url = request.host_url.rstrip('/')
+        short_url = f"{base_url}/s/{short_url_result['short_code']}"
+        
+        print(f"Generated new short URL for: {file_key}")
         return jsonify({
-            'download_url': url,
+            'download_url': short_url,  # Return short URL instead of long presigned URL
+            'short_code': short_url_result['short_code'],
             'file_key': file_key,
             'tier': tier,
             'expires_in_seconds': expiration_seconds,
-            'expires_in_days': expiration_seconds // 86400
+            'expires_in_days': expiration_seconds // 86400,
+            'message': 'New short download URL created'
         })
         
     except s3.exceptions.NoSuchKey:
@@ -484,6 +524,122 @@ def delete_user_file(decoded_token, file_key):
     except Exception as e:
         print(f"Error deleting file {file_key}: {e}")
         return jsonify({'message': f'Error deleting file: {e}'}), 500
+
+
+# ========================================
+# URL Shortener Endpoints
+# ========================================
+
+@app.route('/api/shorten', methods=['POST'])
+@token_required
+def shorten_url(decoded_token):
+    """Create a short URL for a given long URL"""
+    try:
+        data = request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'message': 'URL is required'}), 400
+            
+        full_url = data['url']
+        file_key = data.get('file_key')
+        filename = data.get('filename')
+        expires_in_days = data.get('expires_in_days', 7)
+        
+        # Get user email from token
+        user_email = decoded_token.get('email', 'unknown')
+        
+        # Create short URL
+        result = create_short_url(
+            full_url=full_url,
+            user_email=user_email,
+            file_key=file_key,
+            filename=filename,
+            expires_in_days=expires_in_days
+        )
+        
+        # Build short URL
+        base_url = request.host_url.rstrip('/')
+        short_url = f"{base_url}/s/{result['short_code']}"
+        
+        return jsonify({
+            'short_url': short_url,
+            'short_code': result['short_code'],
+            'created': result['created'],
+            'expires_at': result.get('expires_at'),
+            'message': result['message']
+        })
+        
+    except Exception as e:
+        print(f"Error creating short URL: {e}")
+        return jsonify({'message': f'Error creating short URL: {e}'}), 500
+
+@app.route('/s/<short_code>')
+def redirect_short_url(short_code):
+    """Redirect short URL to full URL"""
+    try:
+        result = get_full_url(short_code)
+        
+        if not result:
+            return jsonify({
+                'message': 'Short URL not found or expired',
+                'error': 'NOT_FOUND'
+            }), 404
+            
+        # Log the redirect for analytics
+        print(f"Redirecting {short_code} to {result['full_url']} (click #{result['click_count']})")
+        
+        # Redirect to the full URL
+        return redirect(result['full_url'])
+        
+    except Exception as e:
+        print(f"Error redirecting short URL {short_code}: {e}")
+        return jsonify({'message': f'Error processing short URL: {e}'}), 500
+
+@app.route('/api/short-urls', methods=['GET'])
+@token_required
+def list_short_urls(decoded_token):
+    """List all short URLs created by the authenticated user"""
+    try:
+        user_email = decoded_token.get('email', 'unknown')
+        limit = int(request.args.get('limit', 100))
+        
+        urls = get_user_urls(user_email, limit)
+        
+        # Add full short URLs
+        base_url = request.host_url.rstrip('/')
+        for url in urls:
+            url['short_url'] = f"{base_url}/s/{url['short_code']}"
+        
+        return jsonify({
+            'urls': urls,
+            'count': len(urls)
+        })
+        
+    except Exception as e:
+        print(f"Error listing short URLs: {e}")
+        return jsonify({'message': f'Error listing short URLs: {e}'}), 500
+
+@app.route('/api/short-urls/<short_code>', methods=['DELETE'])
+@token_required
+def delete_short_url_endpoint(decoded_token, short_code):
+    """Delete a short URL (only if owned by user)"""
+    try:
+        user_email = decoded_token.get('email', 'unknown')
+        
+        deleted = delete_short_url(short_code, user_email)
+        
+        if deleted:
+            return jsonify({
+                'message': 'Short URL deleted successfully',
+                'short_code': short_code
+            })
+        else:
+            return jsonify({
+                'message': 'Short URL not found or unauthorized'
+            }), 404
+            
+    except Exception as e:
+        print(f"Error deleting short URL {short_code}: {e}")
+        return jsonify({'message': f'Error deleting short URL: {e}'}), 500
 
 
 if __name__ == "__main__":
