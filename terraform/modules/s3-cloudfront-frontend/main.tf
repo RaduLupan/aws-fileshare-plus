@@ -64,7 +64,7 @@ resource "aws_cloudfront_distribution" "this" {
     # This is crucial for POST requests, CORS, and any session handling
     forwarded_values {
       query_string = true
-      headers      = ["Origin", "Access-Control-Request-Headers", "Access-Control-Request-Method", "Host"] # Host header is important for ALB routing
+      headers      = ["Origin", "Access-Control-Request-Headers", "Access-Control-Request-Method", "Host", "Authorization"] # Added Authorization for JWT tokens
       cookies {
         forward = "all"
       }
