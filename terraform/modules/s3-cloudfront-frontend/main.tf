@@ -81,7 +81,7 @@ resource "aws_cloudfront_distribution" "this" {
     path_pattern           = "/s/*" # All short URL requests starting with /s/ will go here
     target_origin_id       = "ALB-Origin-${var.environment}" # Reference the ALB origin ID
     viewer_protocol_policy = "redirect-to-https" # Force HTTPS from browser to CloudFront
-    allowed_methods        = ["GET", "HEAD", "OPTIONS", "POST"] # POST for redirect endpoint
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"] # Full method set for POST support
     cached_methods         = ["GET", "HEAD"] # Cache GET requests for performance
     compress               = true
 
