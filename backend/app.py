@@ -272,8 +272,8 @@ def get_download_link(decoded_token):
             expires_in_days=expiration_seconds // 86400  # Convert seconds to days
         )
         
-        # Build short URL
-        base_url = request.host_url.rstrip('/')
+        # Build short URL using CloudFront domain
+        base_url = get_short_url_base()
         short_url = f"{base_url}/s/{short_url_result['short_code']}"
         
         return jsonify({
@@ -466,8 +466,8 @@ def generate_new_download_link(decoded_token):
             expires_in_days=expiration_seconds // 86400  # Convert seconds to days
         )
         
-        # Build short URL
-        base_url = request.host_url.rstrip('/')
+        # Build short URL using CloudFront domain
+        base_url = get_short_url_base()
         short_url = f"{base_url}/s/{short_url_result['short_code']}"
         
         print(f"Generated new short URL for: {file_key}")
@@ -556,8 +556,8 @@ def shorten_url(decoded_token):
             expires_in_days=expires_in_days
         )
         
-        # Build short URL
-        base_url = request.host_url.rstrip('/')
+        # Build short URL using CloudFront domain
+        base_url = get_short_url_base()
         short_url = f"{base_url}/s/{result['short_code']}"
         
         return jsonify({
@@ -641,6 +641,16 @@ def delete_short_url_endpoint(decoded_token, short_code):
         print(f"Error deleting short URL {short_code}: {e}")
         return jsonify({'message': f'Error deleting short URL: {e}'}), 500
 
+
+def get_short_url_base():
+    """Get the base URL for constructing short URLs (prefer CloudFront domain)"""
+    frontend_domain = os.getenv('FRONTEND_DOMAIN')
+    if frontend_domain:
+        # Use CloudFront domain for short URLs
+        return f"https://{frontend_domain}"
+    else:
+        # Fallback to ALB domain (for local development)
+        return request.host_url.rstrip('/')
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

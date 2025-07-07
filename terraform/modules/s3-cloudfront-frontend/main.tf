@@ -76,6 +76,30 @@ resource "aws_cloudfront_distribution" "this" {
     max_ttl     = 0
   }
 
+  # NEW: Ordered Cache Behavior for Short URLs (to route to ALB origin)
+  ordered_cache_behavior {
+    path_pattern           = "/s/*" # All short URL requests starting with /s/ will go here
+    target_origin_id       = "ALB-Origin-${var.environment}" # Reference the ALB origin ID
+    viewer_protocol_policy = "redirect-to-https" # Force HTTPS from browser to CloudFront
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "POST"] # POST for redirect endpoint
+    cached_methods         = ["GET", "HEAD"] # Cache GET requests for performance
+    compress               = true
+
+    # Forward necessary headers for short URL resolution
+    forwarded_values {
+      query_string = true # In case we need query parameters
+      headers      = ["Host", "User-Agent", "Referer"] # Useful for analytics
+      cookies {
+        forward = "none" # Short URLs don't need cookies
+      }
+    }
+
+    # Short URLs can be cached briefly for performance
+    min_ttl     = 0
+    default_ttl = 300    # 5 minutes cache
+    max_ttl     = 3600   # 1 hour max cache
+  }
+
   custom_error_response {
     error_code         = 403
     response_page_path = "/index.html"

@@ -81,6 +81,9 @@ module "backend_app" {
 
   # Configure file retention period for S3 lifecycle policy
   file_retention_days = var.file_retention_days
+  
+  # Pass CloudFront domain for short URL construction
+  frontend_domain = var.cloudfront_custom_domain_name != "" ? var.cloudfront_custom_domain_name : module.frontend_app.cloudfront_domain_name
 }
 
 module "cognito" {

@@ -64,6 +64,12 @@ variable "cognito_client_id" {
   type        = string
 }
 
+variable "frontend_domain" {
+  description = "The CloudFront domain name for the frontend (used for constructing short URLs)"
+  type        = string
+  default     = ""
+}
+
 #---------------------------------------------------------------
 # OPTIONAL PARAMETERS: These parameters have resonable defaults.
 #---------------------------------------------------------------

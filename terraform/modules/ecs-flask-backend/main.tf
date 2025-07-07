@@ -50,6 +50,10 @@ resource "aws_ecs_task_definition" "flask" {
       {
         name  = "COGNITO_CLIENT_ID"
         value = var.cognito_client_id # Use the new input variable
+      },
+      {
+        name  = "FRONTEND_DOMAIN"
+        value = var.frontend_domain # CloudFront domain for short URL construction
       }
     ]
     logConfiguration = {
