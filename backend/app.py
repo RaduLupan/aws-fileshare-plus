@@ -74,17 +74,26 @@ def rsa_key_to_pem(rsa_key_dict):
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        print("=== TOKEN VALIDATION DEBUG ===")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Authorization header: {request.headers.get('Authorization', 'NOT FOUND')}")
+        
         token = None
         
         # Check for the 'Authorization' header
         if 'Authorization' in request.headers:
             # The header should be in the format "Bearer <token>"
             try:
-                token = request.headers['Authorization'].split(" ")[1]
+                auth_header = request.headers['Authorization']
+                print(f"Full Authorization header: {auth_header[:50]}...")
+                token = auth_header.split(" ")[1]
+                print(f"Extracted token: {token[:20]}...")
             except IndexError:
+                print("Bearer token malformed - IndexError")
                 return jsonify({'message': 'Bearer token malformed'}), 401
         
         if not token:
+            print("TOKEN IS MISSING!")
             return jsonify({'message': 'Token is missing!'}), 401
         
         try:
