@@ -478,23 +478,31 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
     setError('');
 
     try {
+      console.log('Starting Premium file upload...');
       const token = await getJwtToken();
+      console.log('Retrieved token for Premium upload:', token ? `${token.substring(0, 20)}...` : 'null');
+      
       if (!token) {
         setError('Authentication error. Please sign in again.');
         return;
       }
 
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      console.log('Using API URL for Premium upload:', apiUrl);
+      
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log('Making Premium upload request...');
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
+      console.log('Premium upload response status:', uploadResponse.status);
       const uploadData = await uploadResponse.json();
+      console.log('Premium upload response data:', uploadData);
       
       if (!uploadResponse.ok) {
         throw new Error(uploadData.message || 'Upload failed');
@@ -816,8 +824,13 @@ const AppContent = ({ user, signOut }) => {
   // Function to get JWT token for backend requests
   const getJwtToken = async () => {
     try {
+      console.log('Getting JWT token...');
       const authSession = await fetchAuthSession();
+      console.log('Auth session:', authSession);
+      console.log('Tokens:', authSession?.tokens);
+      console.log('ID Token:', authSession?.tokens?.idToken);
       const token = authSession?.tokens?.idToken?.toString();
+      console.log('Final token:', token ? `${token.substring(0, 20)}...` : 'null');
       return token;
     } catch (error) {
       console.error('Error getting JWT token:', error);
@@ -929,7 +942,10 @@ This message was sent using FileShare Plus. Experience secure file sharing today
     setUploadMessage('Uploading...');
     setDownloadUrl('');
 
+    console.log('Starting file upload...');
     const token = await getJwtToken();
+    console.log('Retrieved token for upload:', token ? `${token.substring(0, 20)}...` : 'null');
+    
     if (!token) {
       setUploadMessage('Authentication error. Please sign in again.');
       setIsUploading(false);
@@ -938,17 +954,21 @@ This message was sent using FileShare Plus. Experience secure file sharing today
     
     try {
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      console.log('Using API URL:', apiUrl);
       
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log('Making upload request...');
       const uploadResponse = await fetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
+      console.log('Upload response status:', uploadResponse.status);
       const uploadData = await uploadResponse.json();
+      console.log('Upload response data:', uploadData);
       
       if (!uploadResponse.ok) throw new Error(uploadData.message || 'Upload failed');
 
