@@ -192,7 +192,40 @@ Password Reset      ✅ Standard   ✅ Professional
 
 ---
 
-## Next Milestone: Production Readiness & Monetization (Planned)
+## v0.6.1: Email Link Issue Identified & URL Shortening Planning (July 6, 2025)
+
+### 🔍 Issue Discovery
+During testing of the Premium File Explorer's Email Link feature, discovered that the mailto protocol fails with long URLs:
+
+- **Problem**: CloudFront download URLs (~1500+ characters) exceed mailto URL length limits
+- **Testing**: Simple mailto works fine, but complex URLs with long CloudFront paths fail
+- **Impact**: Both free tier and Premium Email Link buttons don't open email clients
+- **Root Cause**: Most browsers/email clients have ~2000 character limits for mailto URLs
+
+### 📋 URL Shortening Solution Planned
+**Selected Approach**: Internal URL Shortener (Option 1)
+- **Backend**: New `/api/shorten` and `/s/{code}` endpoints
+- **Database**: SQLite (dev) / RDS (prod) for URL mappings
+- **Format**: `cf.aws.lupan.ca/s/abc123` (6-character base62 codes)
+- **Features**: Click tracking, expiration handling, analytics ready
+- **Integration**: Seamless with existing file upload/download flow
+
+### 🎯 Current Workaround
+Users can still share files using:
+1. **Copy Link** button → paste manually into email
+2. **Direct download** links work perfectly
+3. **All other features** remain fully functional
+
+---
+
+## Next Milestone: URL Shortening Service (In Development)
+- Phase 1: Basic URL shortener with SQLite backend
+- Phase 2: Integration with file upload/download workflow  
+- Phase 3: Click analytics and enhanced features
+- Fix Email Link functionality for both free and Premium tiers
+- Foundation for advanced link management features
+
+## Future Milestone: Production Readiness & Monetization (Planned)
 - Remove debug logging
 - Add comprehensive error handling
 - Implement file upload progress indicators

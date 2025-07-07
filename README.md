@@ -284,11 +284,20 @@ terraform output frontend_url
 6. ✅ **Premium Access Control**: Tier-based feature restriction
 
 ### 🚀 Next Steps for Enhancement
-1. **Payment Integration**: Implement actual Premium paywall (currently free upgrade)
-2. **File Sharing**: Allow Premium users to share files with other users
-3. **Advanced Search**: Filter files by date, type, size
-4. **Bulk Operations**: Multi-select for batch delete/renewal
-5. **File Versioning**: Keep multiple versions of the same file
-6. **Analytics Dashboard**: File access statistics and usage metrics
+1. **URL Shortening Service**: Fix Email Link functionality with short URLs (next major feature)
+2. **Payment Integration**: Implement actual Premium paywall (currently free upgrade)
+3. **File Sharing**: Allow Premium users to share files with other users
+4. **Advanced Search**: Filter files by date, type, size
+5. **Bulk Operations**: Multi-select for batch delete/renewal
+6. **File Versioning**: Keep multiple versions of the same file
+7. **Analytics Dashboard**: File access statistics and usage metrics
+
+### ⚠️ Known Issues (v0.6.1)
+#### Email Link Functionality
+- **Problem**: Email Link buttons don't open email client reliably
+- **Root Cause**: CloudFront download URLs are too long (~1500+ characters) for mailto protocol
+- **Workaround**: Use "Copy Link" then paste manually into email
+- **Planned Fix**: URL shortening service (internal) to create short links like `cf.aws.lupan.ca/s/abc123`
+- **Implementation**: Phase 1 of next development cycle
 
 ---

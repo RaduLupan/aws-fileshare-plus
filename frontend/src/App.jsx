@@ -753,8 +753,10 @@ Best regards!`;
                             size="small" 
                             variation="warning"
                             onClick={() => emailLink(file.key, file.filename)}
+                            title="Email Link temporarily disabled due to URL length limits - URL shortening service coming soon"
+                            style={{ opacity: 0.6 }}
                           >
-                            📧 Email Link
+                            📧 Email Link (Issue)
                           </Button>
                           <Button 
                             size="small" 
@@ -1053,26 +1055,10 @@ Best regards!`);
                 onClick={() => handleEmailLink(downloadUrl)}
                 fontSize="0.8rem"
                 padding="0.25rem 0.5rem"
-                title="Open email client to share this download link"
+                title="Open email client to share this download link (Currently limited by URL length - use Copy Link as workaround)"
+                style={{ opacity: 0.6 }}
               >
-                Email Link
-              </Button>
-              <Button 
-                size="small" 
-                variation="link" 
-                onClick={() => {
-                  console.log('Simple mailto test clicked');
-                  const simpleMailto = 'mailto:test@example.com?subject=Test&body=Hello%20World';
-                  console.log('Simple mailto URL:', simpleMailto);
-                  const result = window.open(simpleMailto, '_blank');
-                  console.log('Simple mailto result:', result);
-                }}
-                fontSize="0.8rem"
-                padding="0.25rem 0.5rem"
-                title="Test simple mailto functionality"
-                style={{ color: 'red' }}
-              >
-                Test mailto
+                Email Link (Issue)
               </Button>
             </Flex>
           </Flex>
