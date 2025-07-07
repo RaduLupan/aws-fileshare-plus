@@ -62,7 +62,7 @@ module "backend_app" {
 
   cpu           = 256
   memory        = 512
-  desired_count = 0 # Explicitly set to 0 for dev environment's initial deploy
+  desired_count = 1 # Start 1 task for the backend service
 
   enable_alb_deletion_protection = false # Set to true for production environments
   alb_health_check_path          = "/"

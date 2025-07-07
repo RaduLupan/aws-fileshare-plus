@@ -934,7 +934,9 @@ This message was sent using FileShare Plus. Experience secure file sharing today
       setUploadMessage('Authentication error. Please sign in again.');
       setIsUploading(false);
       return;
-    }    try {
+    }
+    
+    try {
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
       
       const formData = new FormData();
@@ -980,7 +982,9 @@ This message was sent using FileShare Plus. Experience secure file sharing today
     if (!token) {
       setUploadMessage('Authentication error. Please sign in again.');
       return;
-    }    try {
+    }
+    
+    try {
       const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
       const response = await fetch(`${apiUrl}/api/upgrade`, {
         method: 'POST',
