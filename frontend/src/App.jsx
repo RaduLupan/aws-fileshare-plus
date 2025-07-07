@@ -613,16 +613,32 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
       }
 
       // Create email content
-      const subject = `File shared with you: ${filename}`;
-      const body = `Hi there,
+      const subject = `🔗 File shared with you via FileShare Plus: ${filename}`;
+      const body = `Hello!
 
-I wanted to share a file with you: ${filename}
+I hope this message finds you well! I wanted to share an important file with you using FileShare Plus, a secure file sharing platform.
 
-Download Link: ${data.download_url}
+📁 File Details:
+• File Name: ${filename}
+• Shared via: FileShare Plus Premium
+• Secure Download Link: ${data.download_url}
 
-This link will expire in ${data.expires_in_days} days.
+🔒 Security Information:
+• This is a secure, encrypted download link
+• The link will automatically expire in ${data.expires_in_days} days for your security
+• No registration required - just click and download
 
-Best regards!`;
+🚀 About FileShare Plus:
+FileShare Plus is a professional file sharing service that prioritizes your privacy and security. All files are encrypted and stored securely in the cloud, with automatic expiration for added protection.
+
+Simply click the download link above to access your file. If you have any questions or need assistance, please don't hesitate to reach out!
+
+Best regards,
+Shared via FileShare Plus
+🌐 https://cf.aws.lupan.ca
+
+---
+This message was sent using FileShare Plus Premium. Experience secure file sharing at its finest!`;
 
       // Create mailto URL
       const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -745,10 +761,9 @@ Best regards!`;
                             size="small" 
                             variation="warning"
                             onClick={() => emailLink(file.key, file.filename)}
-                            title="Email Link temporarily disabled due to URL length limits - URL shortening service coming soon"
-                            style={{ opacity: 0.6 }}
+                            title="Open email client to share this download link"
                           >
-                            📧 Email Link (Issue)
+                            📧 Email Link
                           </Button>
                           <Button 
                             size="small" 
@@ -849,14 +864,38 @@ const AppContent = ({ user, signOut }) => {
 
   // Function to open email client with pre-filled download link
   const handleEmailLink = (downloadUrl) => {
-    const subject = encodeURIComponent('File shared with you - FileShare Plus');
-    const body = encodeURIComponent(`Hi there!
+    const subject = encodeURIComponent('🔗 File shared with you via FileShare Plus');
+    const body = encodeURIComponent(`Hello!
 
-I've shared a file with you. Please copy and paste this download link in your browser:
+I hope this message finds you well! I wanted to share a file with you using FileShare Plus, a secure file sharing platform.
 
-${downloadUrl}
+📁 Download Information:
+• Secure Download Link: ${downloadUrl}
+• Shared via: FileShare Plus (Free Tier)
+• Simply click the link above to download your file
 
-Best regards!`);
+🔒 Security Features:
+• Encrypted file storage and transmission
+• Secure, time-limited download links
+• No registration required for download
+
+🚀 About FileShare Plus:
+FileShare Plus is a professional file sharing service that prioritizes your privacy and security. All files are encrypted and stored securely in the cloud with automatic expiration for added protection.
+
+✨ Upgrade to Premium for enhanced features:
+• Extended link expiration (up to 7 days)
+• File management dashboard
+• Generate multiple download links
+• Advanced sharing options
+
+Simply click the download link above to access your file. If you have any questions or need assistance, please don't hesitate to reach out!
+
+Best regards,
+Shared via FileShare Plus
+🌐 https://cf.aws.lupan.ca
+
+---
+This message was sent using FileShare Plus. Experience secure file sharing today!`);
 
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
     
