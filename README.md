@@ -299,6 +299,23 @@ terraform output frontend_url
 6. **Analytics Dashboard**: File access statistics and usage metrics
 7. **Production Deployment**: Blue-green deployment strategy
 
+### ✅ Resolved Issues (v0.6.3)
+#### JWT Token Authentication - FIXED! 🎉
+- **Root Cause Identified**: CloudFront was not forwarding Authorization headers for API requests
+- **Solution Implemented**: Added `"Authorization"` to CloudFront forwarded headers in `/api/*` cache behavior
+- **Technical Fix**: Modified `terraform/modules/s3-cloudfront-frontend/main.tf` to include Authorization header
+- **Debug Process**: Extensive logging in both frontend and backend revealed header stripping issue
+- **Result**: Both Free and Premium tier uploads now work perfectly end-to-end
+- **Short URLs**: All download links use CloudFront domain `cf.aws.lupan.ca/s/...` and function correctly
+- **Architecture**: Complete JWT validation through CloudFront → ALB → ECS pipeline
+
+#### Complete Upload/Download Flow Working (v0.6.3)
+- ✅ **Free Tier**: Upload → JWT validation → S3 storage → Short URL generation → Email sharing
+- ✅ **Premium Tier**: Upload → JWT validation → S3 storage → Short URL generation → File management
+- ✅ **Authentication**: JWT tokens properly forwarded through CloudFront to backend
+- ✅ **URL Shortener**: All links use CloudFront domain for consistency and reliability
+- ✅ **Email Links**: Professional marketing emails with working short links for all tiers
+
 ### ✅ Resolved Issues (v0.6.2)
 #### Email Link Functionality - FIXED! 🎉
 - **Solution Implemented**: Internal URL shortener service with SQLite backend
