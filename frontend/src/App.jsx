@@ -41,7 +41,22 @@ const CustomAuth = ({ onAuthenticated }) => {
     }
     
     setIsLoading(true);
-    setError('');      try {
+    setError('');
+    
+    try {
+      // First, clear any existing session to avoid conflicts
+      try {
+        await amplifySignOut();
+        localStorage.clear();
+        sessionStorage.clear();
+        console.log('Cleared existing session before sign up');
+      } catch (clearError) {
+        console.log('No existing session to clear');
+      }
+      
+      // Wait a moment to ensure session is cleared
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       // Use email directly as username since alias_attributes = ["email"] is enabled
       setGeneratedUsername(email); // Store email as the "generated" username for consistency
       
@@ -58,8 +73,9 @@ const CustomAuth = ({ onAuthenticated }) => {
       
       // Check if auto sign-in worked
       if (result.isSignUpComplete && result.nextStep?.signInStep === 'DONE') {
-        onAuthenticated();      } else if (result.isSignUpComplete) {
-        setError(`Account created successfully! You can sign in with your email: ${email}`);
+        onAuthenticated();
+      } else if (result.isSignUpComplete) {
+        setError(`Account created successfully! You can now sign in with your email: ${email}`);
         setIsSignUp(false); // Switch to sign-in mode
       } else {
         setError('Account created! Please check the console for next steps.');
@@ -77,6 +93,18 @@ const CustomAuth = ({ onAuthenticated }) => {
     setError('');
     
     try {
+      // First, try to sign out any existing user to clear the session
+      try {
+        await amplifySignOut();
+        console.log('Cleared existing session before sign in');
+      } catch (signOutError) {
+        // If there's no existing session, this will fail silently
+        console.log('No existing session to clear');
+      }
+      
+      // Longer delay to ensure session is fully cleared
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Sign in with email (which is now the username)
       const result = await signIn({
         username: email,
@@ -89,7 +117,33 @@ const CustomAuth = ({ onAuthenticated }) => {
       }
     } catch (error) {
       console.error('SignIn error:', error);
-      setError(error.message || 'Sign in failed');
+      if (error.name === 'UserAlreadyAuthenticatedException') {
+        console.log('User already authenticated, attempting to clear session and retry');
+        try {
+          // Force sign out and try again
+          await amplifySignOut();
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // Wait longer and retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const retryResult = await signIn({
+            username: email,
+            password: password,
+          });
+          
+          console.log('Retry SignIn successful:', retryResult);
+          if (retryResult.isSignedIn) {
+            onAuthenticated();
+          }
+        } catch (retryError) {
+          console.error('Retry SignIn error:', retryError);
+          setError('Authentication session conflict. Please refresh the page and try again.');
+        }
+      } else {
+        setError(error.message || 'Sign in failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -416,6 +470,51 @@ const CustomAuth = ({ onAuthenticated }) => {
           Forgot your password?
         </Button>
       )}
+      
+      {/* Add Clear Session button for troubleshooting authentication issues */}
+      <Button
+        variation="link"
+        onClick={async () => {
+          setIsLoading(true);
+          setError('Clearing session and reloading...');
+          try {
+            // Force sign out from Cognito
+            await amplifySignOut();
+            console.log('Signed out from Cognito');
+          } catch (error) {
+            console.log('No active Cognito session to clear');
+          }
+          
+          try {
+            // Clear all browser storage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Clear any cookies related to Cognito
+            document.cookie.split(";").forEach(function(c) { 
+              document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            console.log('Cleared all local storage and cookies');
+          } catch (error) {
+            console.log('Error clearing storage:', error);
+          }
+          
+          // Reload after a short delay
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        }}
+        isLoading={isLoading}
+        style={{ 
+          width: '100%', 
+          marginTop: '0.5rem', 
+          fontSize: '0.85rem',
+          color: '#666'
+        }}
+      >
+        Having sign-in issues? Clear Session & Reload
+      </Button>
     </Card>
   );
 };
@@ -1414,7 +1513,13 @@ export default function App() {
             setUser(enhancedUser);
             setIsAuthenticated(true);
           } catch (error) {
-            console.log("No current user session");
+            console.log("No current user session, clearing any stale auth state");
+            // Proactively clear any stale authentication state
+            try {
+              await amplifySignOut();
+            } catch (signOutError) {
+              console.log("No session to clear on initialization");
+            }
           }
         } else {
           throw new Error("Amplify Auth configuration is missing or incomplete");
