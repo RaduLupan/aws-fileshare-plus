@@ -533,7 +533,7 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
     const now = new Date();
     const expiresAt = new Date(file.expires_at);
     const diffTime = expiresAt - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffTime <= 0) {
       const daysAgo = Math.abs(diffDays);
