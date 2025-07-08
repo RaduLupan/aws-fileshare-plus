@@ -11,7 +11,16 @@ from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
+import re
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
+from user_management import (
+    initialize_user, 
+    get_user_info, 
+    start_user_trial, 
+    get_user_trial_status,
+    validate_trial_eligibility,
+    process_expired_trials
+)
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -153,6 +162,24 @@ def token_required(f):
             print(f"Token validation error: {e}")
             return jsonify({'message': 'Token is invalid!'}), 401
         
+        # Check for expired trials on each authenticated request
+        try:
+            user_email = decoded_token.get('email')
+            user_id = decoded_token.get('sub')
+            user_groups = decoded_token.get('cognito:groups', [])
+            
+            if user_email and user_id and 'premium-trial' in user_groups:
+                # Check if this trial user's trial has expired
+                trial_status = get_user_trial_status(user_email, user_id)
+                if trial_status['trial_status'] == 'expired':
+                    # Process this expired trial
+                    from cognito_utils import move_user_to_free_group
+                    move_user_to_free_group(user_email)
+                    print(f"Processed expired trial for user {user_email}")
+        except Exception as e:
+            # Don't fail the request if trial checking fails
+            print(f"Warning: Trial expiration check failed: {e}")
+        
         # Pass the decoded token (which contains user claims) to the route
         return f(decoded_token=decoded_token, *args, **kwargs)
 
@@ -253,7 +280,7 @@ def get_download_link(decoded_token):
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
     
-    if 'premium-tier' in user_groups:
+    if 'premium-tier' in user_groups or 'premium-trial' in user_groups:
         expiration_seconds = 604800 # 7 days (S3 maximum)
         tier = 'premium'
     else: # Default to free tier
@@ -361,14 +388,29 @@ def upgrade_tier(decoded_token):
 def list_user_files(decoded_token):
     """List all files for the authenticated user with metadata (Premium feature)"""
     
-    # Check if user has premium access
-    user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
-        return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
-    
-    user_folder = get_user_folder_name(decoded_token)
-    if not user_folder:
-        return jsonify({'message': 'User identification not found in token'}), 400
+    try:
+        print("=== FILES API DEBUG ===")
+        print(f"Decoded token: {decoded_token}")
+        print(f"User groups: {decoded_token.get('cognito:groups', [])}")
+        
+        # Check if user has premium access
+        user_groups = decoded_token.get('cognito:groups', [])
+        if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
+            print(f"User denied access - groups: {user_groups}")
+            return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+        
+        user_folder = get_user_folder_name(decoded_token)
+        if not user_folder:
+            print("User folder not found in token")
+            return jsonify({'message': 'User identification not found in token'}), 400
+            
+        print(f"User folder: {user_folder}")
+        
+    except Exception as e:
+        print(f"Error in files API pre-processing: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'message': f'Error processing request: {str(e)}'}), 500
     
     try:
         print(f"Listing files for user folder: {user_folder}")
@@ -378,6 +420,7 @@ def list_user_files(decoded_token):
             Bucket=S3_BUCKET_NAME,
             Prefix=f"{user_folder}/"
         )
+        print(f"S3 response received: {response.get('ResponseMetadata', {}).get('HTTPStatusCode')}")
         
         files = []
         user_email = decoded_token.get('email', 'unknown')
@@ -444,16 +487,23 @@ def list_user_files(decoded_token):
         # Sort files by last modified (newest first)
         files.sort(key=lambda x: x['last_modified'], reverse=True)
         
-        print(f"Found {len(files)} files for user {user_folder}")
-        return jsonify({
+        result = {
             'files': files,
             'total_count': len(files),
             'user_folder': user_folder
-        })
+        }
+        
+        print(f"Found {len(files)} files for user {user_folder}")
+        print(f"Returning JSON response: {json.dumps(result, indent=2)}")
+        return jsonify(result)
         
     except Exception as e:
         print(f"Error listing files for user {user_folder}: {e}")
-        return jsonify({'message': f'Error retrieving files: {e}'}), 500
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        error_response = {'message': f'Error retrieving files: {str(e)}'}
+        print(f"Returning error JSON: {json.dumps(error_response)}")
+        return jsonify(error_response), 500
 
 
 @app.route("/api/files/new-link", methods=['POST'])
@@ -463,7 +513,7 @@ def generate_new_download_link(decoded_token):
     
     # Check if user has premium access
     user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
+    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
         return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
     
     data = request.get_json()
@@ -549,7 +599,7 @@ def delete_user_file(decoded_token, file_key):
     
     # Check if user has premium access
     user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
+    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
         return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
     
     user_folder = get_user_folder_name(decoded_token)
@@ -705,6 +755,384 @@ def get_short_url_base():
     else:
         # Fallback to ALB domain (for local development)
         return request.host_url.rstrip('/')
+
+# --- NEW: Premium Trial API Endpoints ---
+
+# OLD start-trial endpoint removed - replaced with enhanced debug version below
+
+@app.route('/api/user-status', methods=['GET'])
+@token_required
+def user_status_endpoint(decoded_token):
+    """Get comprehensive user status including trial information"""
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        user_groups = decoded_token.get('cognito:groups', [])
+        
+        if not user_email or not user_id:
+            return jsonify({
+                'error': 'User identification not found in token'
+            }), 400
+        
+        # Get trial status from database
+        trial_status = get_user_trial_status(user_email, user_id)
+        
+        # Determine user tier - prioritize database over JWT groups
+        database_tier = trial_status.get('user_tier', 'Free')
+        
+        if database_tier == 'Premium-Trial':
+            current_tier = 'Premium-Trial'
+        elif database_tier == 'Premium' or 'premium-tier' in user_groups:
+            current_tier = 'Premium'
+        elif 'premium-trial' in user_groups:
+            current_tier = 'Premium-Trial'
+        else:
+            current_tier = 'Free'
+        
+        # Build response
+        response = {
+            'user_email': user_email,
+            'tier': current_tier,
+            'cognito_groups': user_groups,
+            'trial_status': trial_status['trial_status'],
+            'can_start_trial': trial_status['can_start_trial'],
+            'days_remaining': trial_status['days_remaining'],
+            'trial_expires_at': trial_status['trial_expires_at'],
+            'trial_started_at': trial_status['trial_started_at']
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"Error getting user status: {e}")
+        return jsonify({
+            'error': f'Failed to get user status: {str(e)}'
+        }), 500
+
+@app.route('/api/trial-eligibility', methods=['GET'])
+@token_required
+def trial_eligibility_endpoint(decoded_token):
+    """Check if user is eligible to start a Premium trial"""
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        
+        if not user_email or not user_id:
+            return jsonify({
+                'eligible': False,
+                'reason': 'User identification not found in token'
+            }), 400
+        
+        eligibility = validate_trial_eligibility(user_email, user_id)
+        return jsonify(eligibility)
+        
+    except Exception as e:
+        print(f"Error checking trial eligibility: {e}")
+        return jsonify({
+            'eligible': False,
+            'reason': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/admin/expire-trials', methods=['POST'])
+@token_required
+def expire_trials_endpoint(decoded_token):
+    """Admin endpoint to manually process expired trials"""
+    try:
+        user_groups = decoded_token.get('cognito:groups', [])
+        
+        # Check if user has admin privileges (you can modify this logic)
+        if 'admin' not in user_groups and 'premium-tier' not in user_groups:
+            return jsonify({
+                'success': False,
+                'error': 'Insufficient privileges'
+            }), 403
+        
+        result = process_expired_trials()
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error processing expired trials: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to process expired trials: {str(e)}'
+        }), 500
+
+# --- NEW: Debug and Health Check Endpoints ---
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Simple health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': 'v0.7.0-debug'
+    })
+
+@app.route('/api/debug/test-imports', methods=['GET'])
+def test_imports():
+    """Test if all modules can be imported properly"""
+    try:
+        # Test database imports
+        from database import create_or_update_user, get_user_by_email
+        
+        # Test user_management imports  
+        from user_management import start_user_trial, validate_trial_eligibility
+        
+        # Test cognito_utils imports
+        from cognito_utils import add_user_to_group
+        
+        return jsonify({
+            'success': True,
+            'message': 'All imports working correctly',
+            'modules': ['database', 'user_management', 'cognito_utils']
+        })
+    except ImportError as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import error: {str(e)}',
+            'type': 'ImportError'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}',
+            'type': type(e).__name__
+        }), 500
+
+@app.route('/api/start-trial', methods=['POST'])
+@token_required
+def start_trial_endpoint(decoded_token):
+    """Start a 30-day Premium trial for the user"""
+    # Enhanced logging for debugging
+    print(f"[DEBUG] start_trial_endpoint called")
+    print(f"[DEBUG] decoded_token keys: {list(decoded_token.keys()) if decoded_token else 'None'}")
+    
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        
+        print(f"[DEBUG] user_email: {user_email}, user_id: {user_id}")
+        
+        if not user_email or not user_id:
+            print(f"[ERROR] Missing user identification in token")
+            return jsonify({
+                'success': False,
+                'error': 'User identification not found in token'
+            }), 400
+
+        # Test imports before proceeding, use fallback if needed
+        use_fallback = False
+        try:
+            from user_management import validate_trial_eligibility, start_user_trial
+            print(f"[DEBUG] user_management imports successful")
+        except ImportError as import_err:
+            print(f"[WARNING] Failed to import user_management, using fallback: {import_err}")
+            use_fallback = True
+        
+        if use_fallback:
+            # Use simple fallback approach
+            print(f"[DEBUG] Using fallback trial start for {user_email}")
+            result = simple_start_trial_fallback(user_email, user_id)
+            print(f"[DEBUG] Fallback trial result: {result}")
+        else:
+            # Check eligibility first
+            print(f"[DEBUG] Checking trial eligibility for {user_email}")
+            eligibility = validate_trial_eligibility(user_email, user_id)
+            print(f"[DEBUG] Eligibility result: {eligibility}")
+            
+            if not eligibility['eligible']:
+                print(f"[INFO] Trial not eligible: {eligibility['reason']}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Trial not available: {eligibility["reason"]}'
+                }), 400
+            
+            # Start the trial
+            print(f"[DEBUG] Starting trial for {user_email}")
+            result = start_user_trial(user_email, user_id)
+            print(f"[DEBUG] Trial start result: {result}")
+        
+        if result['success']:
+            print(f"[SUCCESS] Trial started successfully for {user_email}")
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'trial_expires_at': result['trial_status']['trial_expires_at'],
+                'days_remaining': result['trial_status']['days_remaining']
+            })
+        else:
+            print(f"[ERROR] Trial start failed: {result['error']}")
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        print(f"[EXCEPTION] Error starting trial for user: {e}")
+        print(f"[EXCEPTION] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[EXCEPTION] Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to start trial: {str(e)}',
+            'exception_type': type(e).__name__
+        }), 500
+
+# --- Fallback functions in case of import issues ---
+def simple_start_trial_fallback(user_email, user_id):
+    """Simple fallback trial starter for debugging"""
+    from datetime import datetime, timedelta
+    try:
+        # Ensure trial columns exist
+        if not ensure_trial_columns():
+            return {
+                'success': False,
+                'error': 'Database migration failed'
+            }
+        
+        # Try to import and use database functions
+        from database import get_db_connection
+        
+        # Simple trial start logic
+        expires_at = datetime.now() + timedelta(days=30)
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Try to update user with trial info
+            cursor.execute('''
+                UPDATE users 
+                SET user_tier = 'premium-trial',
+                    trial_started_at = CURRENT_TIMESTAMP,
+                    trial_expires_at = ?,
+                    trial_used = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? OR email = ?
+            ''', (expires_at.isoformat(), user_id, user_email))
+            
+            if cursor.rowcount == 0:
+                # User doesn't exist, create them
+                cursor.execute('''
+                    INSERT INTO users (user_id, email, user_tier, trial_started_at, trial_expires_at, trial_used)
+                    VALUES (?, ?, 'premium-trial', CURRENT_TIMESTAMP, ?, TRUE)
+                ''', (user_id, user_email, expires_at.isoformat()))
+            
+            conn.commit()
+            
+        # Try to update Cognito groups
+        try:
+            from cognito_utils import add_user_to_group, remove_user_from_group
+            remove_user_from_group(user_email, 'free-tier')
+            add_user_to_group(user_email, 'premium-trial')
+            print(f"[DEBUG] Cognito groups updated for {user_email}")
+        except Exception as cognito_err:
+            print(f"[WARNING] Cognito group update failed: {cognito_err}")
+            
+        return {
+            'success': True,
+            'message': 'Trial started successfully (fallback method)',
+            'trial_status': {
+                'trial_expires_at': expires_at.isoformat(),
+                'days_remaining': 30
+            }
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Fallback trial start failed: {str(e)}'
+        }
+
+# --- Existing error handlers ---
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors with JSON response"""
+    return jsonify({'message': 'Endpoint not found'}), 404
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    """Handle 405 errors with JSON response"""
+    return jsonify({'message': 'Method not allowed'}), 405
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors with JSON response"""
+    return jsonify({'message': 'Internal server error occurred'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle all other exceptions with JSON response"""
+    # Log the actual error for debugging
+    import traceback
+    print(f"Unhandled exception: {e}")
+    print(f"Traceback: {traceback.format_exc()}")
+    
+    # Return a generic JSON error response
+    return jsonify({'message': 'An unexpected error occurred'}), 500
+
+# --- Setup and Initialization Functions ---
+
+def ensure_premium_trial_group():
+    """Ensure the premium-trial Cognito group exists"""
+    try:
+        from cognito_utils import ensure_trial_group_exists, validate_cognito_setup
+        
+        # Create premium-trial group if it doesn't exist
+        ensure_trial_group_exists()
+        
+        # Validate all required groups exist
+        validation = validate_cognito_setup()
+        if validation['valid']:
+            print("✅ All required Cognito groups are available")
+        else:
+            print(f"⚠️ Missing Cognito groups: {validation.get('missing_groups', [])}")
+            
+    except Exception as e:
+        print(f"Warning: Could not validate Cognito setup: {e}")
+
+# Database migration check for trial columns
+def ensure_trial_columns():
+    """Ensure trial columns exist in users table"""
+    try:
+        from database import get_db_connection
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if trial columns exist
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            missing_columns = []
+            required_columns = ['trial_started_at', 'trial_expires_at', 'trial_used']
+            
+            for col in required_columns:
+                if col not in columns:
+                    missing_columns.append(col)
+            
+            # Add missing columns
+            if missing_columns:
+                print(f"[MIGRATION] Adding missing trial columns: {missing_columns}")
+                
+                if 'trial_started_at' in missing_columns:
+                    cursor.execute('ALTER TABLE users ADD COLUMN trial_started_at TIMESTAMP NULL')
+                
+                if 'trial_expires_at' in missing_columns:
+                    cursor.execute('ALTER TABLE users ADD COLUMN trial_expires_at TIMESTAMP NULL')
+                
+                if 'trial_used' in missing_columns:
+                    cursor.execute('ALTER TABLE users ADD COLUMN trial_used BOOLEAN DEFAULT FALSE')
+                
+                conn.commit()
+                print(f"[MIGRATION] Trial columns added successfully")
+            
+            return True
+            
+    except Exception as e:
+        print(f"[ERROR] Failed to ensure trial columns: {e}")
+        return False
+
+# Initialize Cognito groups and ensure trial columns on startup
+ensure_premium_trial_group()
+ensure_trial_columns()
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
