@@ -11,6 +11,7 @@ from functools import wraps
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
+import re
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
 from user_management import (
     initialize_user, 
@@ -486,17 +487,6 @@ def list_user_files(decoded_token):
         # Sort files by last modified (newest first)
         files.sort(key=lambda x: x['last_modified'], reverse=True)
         
-        result = {
-            'files': files,
-            'total_count': len(files),
-            'user_folder': user_folder
-        }
-        
-        print(f"Found {len(files)} files for user {user_folder}")
-        print(f"Returning JSON response: {json.dumps(result, indent=2)}")
-        return jsonify(result)
-        
-    except Exception as e:
         result = {
             'files': files,
             'total_count': len(files),
