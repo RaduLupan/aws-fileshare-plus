@@ -508,8 +508,18 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
         throw new Error(uploadData.message || 'Upload failed');
       }
 
-      setMessage('File uploaded successfully!');
+      setMessage('File uploaded successfully! Generating 3-day download link...');
       setFile(null);
+      
+      // Auto-generate a 3-day link for Premium uploads
+      if (uploadData.file_key) {
+        try {
+          await generateNewLink(uploadData.file_key, 3);
+        } catch (linkError) {
+          console.error('Error auto-generating link:', linkError);
+          setMessage('File uploaded successfully! (Link generation failed - you can create one manually)');
+        }
+      }
       
       // Reload files to show the new upload
       setTimeout(() => {
