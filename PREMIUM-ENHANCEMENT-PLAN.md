@@ -179,15 +179,16 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 
 ---
 
-## **Phase 4: Testing & Polish** ⏳
+## **Phase 4: Testing & Polish** 🔄
 
 ### **4.1 Functional Testing**
-- [ ] **Test**: All expiration durations (1, 3, 5, 7 days)
-- [ ] **Test**: Expired link display ("X days ago")
-- [ ] **Test**: Color coding (green=valid, red=expired)
-- [ ] **Test**: Default 3-day selection works
-- [ ] **Test**: Real-time updates after link generation
-- [ ] **Status**: ❌ Not Started
+- [x] **Test**: All expiration durations (1, 3, 5, 7 days)
+- [x] **Test**: Expired link display ("X days ago")
+- [x] **Test**: Color coding (green=valid, red=expired)
+- [x] **Test**: Default 3-day selection works
+- [x] **Test**: Real-time updates after link generation
+- [x] **Bug Found & Fixed**: Math.ceil() causing +1 day display error
+- [x] **Status**: ✅ In Progress
 
 ### **4.2 Edge Case Testing**
 - [ ] **Test**: Links expiring today (boundary case)
@@ -197,11 +198,27 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 - [ ] **Status**: ❌ Not Started
 
 ### **4.3 UI/UX Polish**
-- [ ] **Task**: Ensure dropdown UX is smooth
-- [ ] **Task**: Verify table layout doesn't break on different screen sizes
-- [ ] **Task**: Test color contrast for accessibility
-- [ ] **Task**: Add loading indicators if needed
-- [ ] **Status**: ❌ Not Started
+- [x] **Test**: Ensure dropdown UX is smooth
+- [x] **Test**: Verify table layout doesn't break on different screen sizes
+- [ ] **Test**: Test color contrast for accessibility
+- [ ] **Test**: Add loading indicators if needed
+- [ ] **Status**: ⏳ In Progress
+
+---
+
+## 🧪 **Testing Notes & Bug Fixes**
+
+### **Bug #1: Expiration Days Display Off by +1**
+- **Issue**: 3-day links showing as "4 days" 
+- **Root Cause**: `Math.ceil()` rounding up fractional hours (3.01 days → 4 days)
+- **Fix**: Changed to `Math.round()` for accurate day calculation
+- **Status**: ✅ Fixed and committed
+- **Testing**: Verified 3-day link now correctly shows "3 days"
+
+### **Deployment Status**
+- **Backend**: ✅ Deployed (includes database migration)
+- **Frontend**: ✅ Deployed + Bug Fix Needed
+- **Testing Environment**: https://cf.aws.lupan.ca
 
 ---
 
