@@ -911,6 +911,13 @@ def test_imports():
     except Exception as e:
         results['cognito_utils'] = f'FAILED: {str(e)}'
     
+    # Test simple trial functions
+    try:
+        from simple_trial_functions import simple_start_trial, simple_add_user_to_group
+        results['simple_trial_functions'] = 'SUCCESS'
+    except Exception as e:
+        results['simple_trial_functions'] = f'FAILED: {str(e)}'
+    
     return jsonify({
         'success': True,
         'imports': results
@@ -998,60 +1005,35 @@ def start_trial_endpoint(decoded_token):
 # --- Fallback functions in case of import issues ---
 def simple_start_trial_fallback(user_email, user_id):
     """Simple fallback trial starter for debugging"""
-    from datetime import datetime, timedelta
     try:
-        # Ensure trial columns exist
-        if not ensure_trial_columns():
+        # Use the simple trial functions
+        from simple_trial_functions import simple_start_trial, simple_add_user_to_group, simple_remove_user_from_group
+        
+        print(f"[FALLBACK] Starting trial for {user_email} using simple functions")
+        
+        # Start the trial in database
+        result = simple_start_trial(user_id, user_email)
+        
+        if result['success']:
+            # Try to update Cognito groups
+            try:
+                simple_remove_user_from_group(user_email, 'free-tier')
+                simple_add_user_to_group(user_email, 'premium-trial')
+                print(f"[FALLBACK] Cognito groups updated for {user_email}")
+            except Exception as cognito_err:
+                print(f"[WARNING] Cognito group update failed: {cognito_err}")
+                
             return {
-                'success': False,
-                'error': 'Database migration failed'
+                'success': True,
+                'message': 'Trial started successfully (fallback method)',
+                'trial_status': {
+                    'trial_expires_at': result['trial_expires_at'],
+                    'days_remaining': result['days_remaining']
+                }
             }
-        
-        # Try to import and use database functions
-        from database import get_db_connection
-        
-        # Simple trial start logic
-        expires_at = datetime.now() + timedelta(days=30)
-        
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            # Try to update user with trial info
-            cursor.execute('''
-                UPDATE users 
-                SET user_tier = 'premium-trial',
-                    trial_started_at = CURRENT_TIMESTAMP,
-                    trial_expires_at = ?,
-                    trial_used = TRUE,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? OR email = ?
-            ''', (expires_at.isoformat(), user_id, user_email))
+        else:
+            return result
             
-            if cursor.rowcount == 0:
-                # User doesn't exist, create them
-                cursor.execute('''
-                    INSERT INTO users (user_id, email, user_tier, trial_started_at, trial_expires_at, trial_used)
-                    VALUES (?, ?, 'premium-trial', CURRENT_TIMESTAMP, ?, TRUE)
-                ''', (user_id, user_email, expires_at.isoformat()))
-            
-            conn.commit()
-            
-        # Try to update Cognito groups
-        try:
-            from cognito_utils import add_user_to_group, remove_user_from_group
-            remove_user_from_group(user_email, 'free-tier')
-            add_user_to_group(user_email, 'premium-trial')
-            print(f"[DEBUG] Cognito groups updated for {user_email}")
-        except Exception as cognito_err:
-            print(f"[WARNING] Cognito group update failed: {cognito_err}")
-            
-        return {
-            'success': True,
-            'message': 'Trial started successfully (fallback method)',
-            'trial_status': {
-                'trial_expires_at': expires_at.isoformat(),
-                'days_remaining': 30
-            }
-        }
     except Exception as e:
         return {
             'success': False,
