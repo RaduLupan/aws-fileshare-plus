@@ -387,14 +387,29 @@ def upgrade_tier(decoded_token):
 def list_user_files(decoded_token):
     """List all files for the authenticated user with metadata (Premium feature)"""
     
-    # Check if user has premium access
-    user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
-        return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
-    
-    user_folder = get_user_folder_name(decoded_token)
-    if not user_folder:
-        return jsonify({'message': 'User identification not found in token'}), 400
+    try:
+        print("=== FILES API DEBUG ===")
+        print(f"Decoded token: {decoded_token}")
+        print(f"User groups: {decoded_token.get('cognito:groups', [])}")
+        
+        # Check if user has premium access
+        user_groups = decoded_token.get('cognito:groups', [])
+        if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
+            print(f"User denied access - groups: {user_groups}")
+            return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+        
+        user_folder = get_user_folder_name(decoded_token)
+        if not user_folder:
+            print("User folder not found in token")
+            return jsonify({'message': 'User identification not found in token'}), 400
+            
+        print(f"User folder: {user_folder}")
+        
+    except Exception as e:
+        print(f"Error in files API pre-processing: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'message': f'Error processing request: {str(e)}'}), 500
     
     try:
         print(f"Listing files for user folder: {user_folder}")
@@ -875,6 +890,33 @@ def expire_trials_endpoint(decoded_token):
             'success': False,
             'error': f'Failed to process expired trials: {str(e)}'
         }), 500
+
+# --- Global Error Handlers to Ensure JSON Responses ---
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors with JSON response"""
+    return jsonify({'message': 'Endpoint not found'}), 404
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    """Handle 405 errors with JSON response"""
+    return jsonify({'message': 'Method not allowed'}), 405
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors with JSON response"""
+    return jsonify({'message': 'Internal server error occurred'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle all other exceptions with JSON response"""
+    # Log the actual error for debugging
+    import traceback
+    print(f"Unhandled exception: {e}")
+    print(f"Traceback: {traceback.format_exc()}")
+    
+    # Return a generic JSON error response
+    return jsonify({'message': 'An unexpected error occurred'}), 500
 
 # --- Setup and Initialization Functions ---
 
