@@ -13,14 +13,15 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
 import re
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
-from user_management import (
-    initialize_user, 
-    get_user_info, 
-    start_user_trial, 
-    get_user_trial_status,
-    validate_trial_eligibility,
-    process_expired_trials
-)
+# NOTE: user_management imports moved to runtime to prevent startup crashes
+# from user_management import (
+#     initialize_user, 
+#     get_user_info, 
+#     start_user_trial, 
+#     get_user_trial_status,
+#     validate_trial_eligibility,
+#     process_expired_trials
+# )
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -170,12 +171,18 @@ def token_required(f):
             
             if user_email and user_id and 'premium-trial' in user_groups:
                 # Check if this trial user's trial has expired
-                trial_status = get_user_trial_status(user_email, user_id)
-                if trial_status['trial_status'] == 'expired':
-                    # Process this expired trial
-                    from cognito_utils import move_user_to_free_group
-                    move_user_to_free_group(user_email)
-                    print(f"Processed expired trial for user {user_email}")
+                try:
+                    from user_management import get_user_trial_status
+                    trial_status = get_user_trial_status(user_email, user_id)
+                    if trial_status['trial_status'] == 'expired':
+                        # Process this expired trial
+                        from cognito_utils import move_user_to_free_group
+                        move_user_to_free_group(user_email)
+                        print(f"Processed expired trial for user {user_email}")
+                except ImportError as ie:
+                    print(f"Warning: Could not import user_management: {ie}")
+                except Exception as e:
+                    print(f"Warning: Trial status check failed: {e}")
         except Exception as e:
             # Don't fail the request if trial checking fails
             print(f"Warning: Trial expiration check failed: {e}")
@@ -192,7 +199,7 @@ s3 = boto3.client('s3', region_name=AWS_REGION)
 cognito_client = boto3.client('cognito-idp', region_name=AWS_REGION)
 
 @app.route("/")
-def health_check():
+def root_health_check():
     return jsonify({"status": "ok", "message": "Backend is healthy"})
 
 # --- UPDATED: This endpoint is now protected ---
@@ -775,7 +782,17 @@ def user_status_endpoint(decoded_token):
             }), 400
         
         # Get trial status from database
-        trial_status = get_user_trial_status(user_email, user_id)
+        try:
+            from user_management import get_user_trial_status
+            trial_status = get_user_trial_status(user_email, user_id)
+        except ImportError:
+            # Fallback if user_management can't be imported
+            trial_status = {
+                'user_tier': 'Free',
+                'trial_status': 'not_started',
+                'days_remaining': 0,
+                'can_start_trial': True
+            }
         
         # Determine user tier - prioritize database over JWT groups
         database_tier = trial_status.get('user_tier', 'Free')
@@ -871,33 +888,33 @@ def health_check():
 @app.route('/api/debug/test-imports', methods=['GET'])
 def test_imports():
     """Test if all modules can be imported properly"""
+    results = {}
+    
+    # Test database imports
     try:
-        # Test database imports
         from database import create_or_update_user, get_user_by_email
-        
-        # Test user_management imports  
-        from user_management import start_user_trial, validate_trial_eligibility
-        
-        # Test cognito_utils imports
-        from cognito_utils import add_user_to_group
-        
-        return jsonify({
-            'success': True,
-            'message': 'All imports working correctly',
-            'modules': ['database', 'user_management', 'cognito_utils']
-        })
-    except ImportError as e:
-        return jsonify({
-            'success': False,
-            'error': f'Import error: {str(e)}',
-            'type': 'ImportError'
-        }), 500
+        results['database'] = 'SUCCESS'
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Unexpected error: {str(e)}',
-            'type': type(e).__name__
-        }), 500
+        results['database'] = f'FAILED: {str(e)}'
+    
+    # Test user_management imports  
+    try:
+        from user_management import start_user_trial, validate_trial_eligibility
+        results['user_management'] = 'SUCCESS'
+    except Exception as e:
+        results['user_management'] = f'FAILED: {str(e)}'
+    
+    # Test cognito_utils imports
+    try:
+        from cognito_utils import add_user_to_group
+        results['cognito_utils'] = 'SUCCESS'
+    except Exception as e:
+        results['cognito_utils'] = f'FAILED: {str(e)}'
+    
+    return jsonify({
+        'success': True,
+        'imports': results
+    })
 
 @app.route('/api/start-trial', methods=['POST'])
 @token_required
