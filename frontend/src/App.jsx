@@ -512,9 +512,9 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
       setFile(null);
       
       // Auto-generate a 3-day link for Premium uploads
-      if (uploadData.file_key) {
+      if (uploadData.file_name) {
         try {
-          await generateNewLink(uploadData.file_key, 3);
+          await generateNewLink(uploadData.file_name, 3);
         } catch (linkError) {
           console.error('Error auto-generating link:', linkError);
           setMessage('File uploaded successfully! (Link generation failed - you can create one manually)');
