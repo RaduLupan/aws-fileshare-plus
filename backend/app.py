@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
 import re
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
+from database import init_database
 # NOTE: user_management imports moved to runtime to prevent startup crashes
 # from user_management import (
 #     initialize_user, 
@@ -25,6 +26,20 @@ from url_shortener import create_short_url, get_full_url, get_user_urls, delete_
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+
+# Initialize database on app startup
+try:
+    init_database()
+    print("Database initialized successfully on startup")
+    
+    # TODO: Now that tables exist, ensure trial columns and Cognito groups
+    # ensure_premium_trial_group()
+    # ensure_trial_columns()
+    print("Database initialization completed - trial system setup pending")
+    
+except Exception as e:
+    print(f"ERROR: Failed to initialize database on startup: {e}")
+    # Continue anyway - app might still work for basic functions
 
 # Configure CORS to allow localhost for development
 CORS(app, origins=[
@@ -1138,13 +1153,6 @@ def ensure_trial_columns():
         print(f"[ERROR] Failed to ensure trial columns: {e}")
         return False
 
-# Initialize Cognito groups and ensure trial columns on startup
-ensure_premium_trial_group()
-ensure_trial_columns()
-
-if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
 @app.route('/api/debug/test-fallback', methods=['GET'])
 def test_fallback():
     """Test the fallback trial logic without authentication"""
@@ -1166,3 +1174,47 @@ def test_fallback():
             'error': f'Fallback test failed: {str(e)}',
             'exception_type': type(e).__name__
         }), 500
+
+@app.route('/api/debug/check-db-tables', methods=['GET'])
+def check_db_tables():
+    """Check if database tables exist"""
+    try:
+        import sqlite3
+        import os
+        
+        db_path = os.path.join(os.path.dirname(__file__), 'url_shortener.db')
+        
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Check if tables exist
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            # Check users table specifically
+            users_table_exists = 'users' in tables
+            
+            # If users table exists, check its structure
+            table_info = {}
+            if users_table_exists:
+                cursor.execute("PRAGMA table_info(users)")
+                table_info = {row[1]: row[2] for row in cursor.fetchall()}
+            
+            return jsonify({
+                'success': True,
+                'database_path': db_path,
+                'database_exists': os.path.exists(db_path),
+                'all_tables': tables,
+                'users_table_exists': users_table_exists,
+                'users_table_columns': table_info,
+                'message': 'Database table check completed'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Database check failed: {str(e)}',
+            'exception_type': type(e).__name__
+        }), 500
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
