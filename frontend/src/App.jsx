@@ -422,7 +422,7 @@ const CustomAuth = ({ onAuthenticated }) => {
 
 // This is the inner component that will be rendered ONLY after a successful login.
 // Premium File Explorer Component
-const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken }) => {
+const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken, trialDaysRemaining = 0 }) => {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -752,13 +752,41 @@ This message was sent using FileShare Plus Premium. Experience secure file shari
     <Flex direction="column" alignItems="center" padding="2rem">
       <Card style={{ maxWidth: '800px', width: '100%', padding: '2rem' }}>
         <Flex direction="row" justifyContent="space-between" alignItems="center" marginBottom="2rem">
-          <Heading level={1}>Premium File Manager</Heading>
+          <Heading level={1}>
+            Premium File Manager {tier === 'Premium-Trial' && '(Trial)'}
+          </Heading>
           <Button onClick={signOut} variation="primary">Sign Out</Button>
         </Flex>
 
         <Text marginBottom="1rem">
           Welcome {user?.displayName || user?.email || user?.username}! You have <strong>{tier}</strong> tier access.
+          {tier === 'Premium-Trial' && trialDaysRemaining > 0 && (
+            <Text 
+              color="var(--amplify-colors-orange-80)" 
+              fontWeight="600" 
+              fontSize="0.9rem"
+              marginTop="0.5rem"
+            >
+              ⏰ {trialDaysRemaining} days remaining in your trial
+            </Text>
+          )}
         </Text>
+
+        {tier === 'Premium-Trial' && (
+          <Card variation="outlined" backgroundColor="var(--amplify-colors-blue-10)" padding="1rem" marginBottom="2rem">
+            <Text fontSize="0.9rem" color="var(--amplify-colors-blue-80)" textAlign="center">
+              🎯 Enjoying the Premium features? 
+              <Button 
+                variation="link" 
+                size="small" 
+                marginLeft="0.5rem"
+                onClick={() => alert('Premium upgrade will be available soon!')}
+              >
+                Upgrade to Premium
+              </Button>
+            </Text>
+          </Card>
+        )}
 
         {/* Upload Section */}
         <Card variation="outlined" padding="1.5rem" marginBottom="2rem">
@@ -887,25 +915,48 @@ const AppContent = ({ user, signOut }) => {
   const [downloadUrl, setDownloadUrl] = useState('');
   const [tier, setTier] = useState('Free');
   const [isUploading, setIsUploading] = useState(false);
+  const [trialStatus, setTrialStatus] = useState(null);
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
+  const [canStartTrial, setCanStartTrial] = useState(false);
 
-  // Function to get the user's tier from their JWT
+  // Function to get the user's tier from their JWT and trial status
   useEffect(() => {
-    const getUserTier = async () => {
+    const getUserTierAndTrialStatus = async () => {
         try {
             const { tokens } = await fetchAuthSession();
             const userGroups = tokens?.accessToken.payload['cognito:groups'] || [];
+            
+            // Get user status from backend
+            const token = tokens?.idToken?.toString();
+            if (token) {
+              const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+              const response = await fetch(`${apiUrl}/api/user-status`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              if (response.ok) {
+                const userData = await response.json();
+                setTrialStatus(userData.trial_status);
+                setTrialDaysRemaining(userData.days_remaining || 0);
+                setCanStartTrial(userData.can_start_trial || false);
+              }
+            }
+            
+            // Determine tier from groups
             if (userGroups.includes('premium-tier')) {
                 setTier('Premium');
+            } else if (userGroups.includes('premium-trial')) {
+                setTier('Premium-Trial');
             } else {
                 setTier('Free');
             }
         } catch (error) {
-            console.error('Error getting user tier:', error);
+            console.error('Error getting user tier and trial status:', error);
             setTier('Free'); // Default to free on error
         }
     };
 
-    getUserTier();
+    getUserTierAndTrialStatus();
   }, []);
 
   // Function to get JWT token for backend requests
@@ -925,9 +976,9 @@ const AppContent = ({ user, signOut }) => {
     }
   };
 
-  // Show Premium File Explorer for Premium users
-  if (tier === 'Premium') {
-    return <PremiumFileExplorer signOut={signOut} user={user} tier={tier} getJwtToken={getJwtToken} />;
+  // Show Premium File Explorer for Premium and Premium-Trial users
+  if (tier === 'Premium' || tier === 'Premium-Trial') {
+    return <PremiumFileExplorer signOut={signOut} user={user} tier={tier} getJwtToken={getJwtToken} trialDaysRemaining={trialDaysRemaining} />;
   }
 
   // Function to copy text to clipboard
@@ -1111,6 +1162,33 @@ This message was sent using FileShare Plus. Experience secure file sharing today
     }
   };
 
+  const handleStartTrial = async () => {
+    setUploadMessage('Starting your 30-day Premium trial...');
+    const token = await getJwtToken();
+    if (!token) {
+      setUploadMessage('Authentication error. Please sign in again.');
+      return;
+    }
+    
+    try {
+      const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+      const response = await fetch(`${apiUrl}/api/start-trial`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      
+      if (!response.ok) throw new Error(data.error || 'Failed to start trial');
+      
+      setUploadMessage('🎉 Premium trial started! Please sign out and sign back in to access Premium features.');
+      setCanStartTrial(false);
+      
+    } catch (error) {
+      console.error('An error occurred starting trial:', error);
+      setUploadMessage(`Error: ${error.message}`);
+    }
+  };
+
   return (
     <Flex direction="column" alignItems="center" justifyContent="center" minHeight="100vh" padding="2rem" background="var(--amplify-colors-background-secondary)">
       <Card variation="elevated" width="100%" maxWidth="500px">
@@ -1175,9 +1253,43 @@ This message was sent using FileShare Plus. Experience secure file sharing today
         )}
 
         {tier === 'Free' && (
-          <Button onClick={handleUpgrade} marginTop="2rem" isFullWidth={true}>
-            Upgrade to Premium (Free for now)
-          </Button>
+          <Flex direction="column" gap="1rem" marginTop="2rem">
+            {canStartTrial ? (
+              <>
+                <Text textAlign="center" fontSize="0.9rem" color="var(--amplify-colors-font-secondary)">
+                  🎉 Try Premium Features - Free for 30 days!
+                </Text>
+                <Text textAlign="center" fontSize="0.8rem" color="var(--amplify-colors-font-secondary)">
+                  • Advanced link expiration management<br/>
+                  • File organization and search<br/>
+                  • Priority support
+                </Text>
+                <Button onClick={handleStartTrial} variation="primary" isFullWidth={true}>
+                  Try Premium - Free for 30 days
+                </Button>
+                <Button 
+                  onClick={handleUpgrade} 
+                  variation="link" 
+                  isFullWidth={true}
+                  color="var(--amplify-colors-font-tertiary)"
+                  isDisabled={true}
+                  title="Premium upgrade will be available soon"
+                >
+                  Upgrade to Premium
+                </Button>
+              </>
+            ) : (
+              <Button 
+                onClick={handleUpgrade} 
+                marginTop="2rem" 
+                isFullWidth={true}
+                isDisabled={true}
+                title="Trial already used or upgrade coming soon"
+              >
+                Upgrade to Premium
+              </Button>
+            )}
+          </Flex>
         )}
       </Card>
     </Flex>

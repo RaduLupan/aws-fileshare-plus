@@ -12,6 +12,14 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
+from user_management import (
+    initialize_user, 
+    get_user_info, 
+    start_user_trial, 
+    get_user_trial_status,
+    validate_trial_eligibility,
+    process_expired_trials
+)
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -153,6 +161,24 @@ def token_required(f):
             print(f"Token validation error: {e}")
             return jsonify({'message': 'Token is invalid!'}), 401
         
+        # Check for expired trials on each authenticated request
+        try:
+            user_email = decoded_token.get('email')
+            user_id = decoded_token.get('sub')
+            user_groups = decoded_token.get('cognito:groups', [])
+            
+            if user_email and user_id and 'premium-trial' in user_groups:
+                # Check if this trial user's trial has expired
+                trial_status = get_user_trial_status(user_email, user_id)
+                if trial_status['trial_status'] == 'expired':
+                    # Process this expired trial
+                    from cognito_utils import move_user_to_free_group
+                    move_user_to_free_group(user_email)
+                    print(f"Processed expired trial for user {user_email}")
+        except Exception as e:
+            # Don't fail the request if trial checking fails
+            print(f"Warning: Trial expiration check failed: {e}")
+        
         # Pass the decoded token (which contains user claims) to the route
         return f(decoded_token=decoded_token, *args, **kwargs)
 
@@ -253,7 +279,7 @@ def get_download_link(decoded_token):
     # Determine expiration time based on user's group
     user_groups = decoded_token.get('cognito:groups', [])
     
-    if 'premium-tier' in user_groups:
+    if 'premium-tier' in user_groups or 'premium-trial' in user_groups:
         expiration_seconds = 604800 # 7 days (S3 maximum)
         tier = 'premium'
     else: # Default to free tier
@@ -363,7 +389,7 @@ def list_user_files(decoded_token):
     
     # Check if user has premium access
     user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
+    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
         return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
     
     user_folder = get_user_folder_name(decoded_token)
@@ -463,7 +489,7 @@ def generate_new_download_link(decoded_token):
     
     # Check if user has premium access
     user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
+    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
         return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
     
     data = request.get_json()
@@ -549,7 +575,7 @@ def delete_user_file(decoded_token, file_key):
     
     # Check if user has premium access
     user_groups = decoded_token.get('cognito:groups', [])
-    if 'premium-tier' not in user_groups:
+    if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
         return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
     
     user_folder = get_user_folder_name(decoded_token)
@@ -705,6 +731,169 @@ def get_short_url_base():
     else:
         # Fallback to ALB domain (for local development)
         return request.host_url.rstrip('/')
+
+# --- NEW: Premium Trial API Endpoints ---
+
+@app.route('/api/start-trial', methods=['POST'])
+@token_required
+def start_trial_endpoint(decoded_token):
+    """Start a 30-day Premium trial for the user"""
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        
+        if not user_email or not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'User identification not found in token'
+            }), 400
+        
+        # Check eligibility first
+        eligibility = validate_trial_eligibility(user_email, user_id)
+        if not eligibility['eligible']:
+            return jsonify({
+                'success': False,
+                'error': f'Trial not available: {eligibility["reason"]}'
+            }), 400
+        
+        # Start the trial
+        result = start_user_trial(user_email, user_id)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'trial_expires_at': result['trial_status']['trial_expires_at'],
+                'days_remaining': result['trial_status']['days_remaining']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        print(f"Error starting trial for user: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to start trial: {str(e)}'
+        }), 500
+
+@app.route('/api/user-status', methods=['GET'])
+@token_required
+def user_status_endpoint(decoded_token):
+    """Get comprehensive user status including trial information"""
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        user_groups = decoded_token.get('cognito:groups', [])
+        
+        if not user_email or not user_id:
+            return jsonify({
+                'error': 'User identification not found in token'
+            }), 400
+        
+        # Get trial status from database
+        trial_status = get_user_trial_status(user_email, user_id)
+        
+        # Determine user tier from Cognito groups (more reliable)
+        if 'premium-tier' in user_groups:
+            current_tier = 'Premium'
+        elif 'premium-trial' in user_groups:
+            current_tier = 'Premium-Trial'
+        else:
+            current_tier = 'Free'
+        
+        # Build response
+        response = {
+            'user_email': user_email,
+            'tier': current_tier,
+            'cognito_groups': user_groups,
+            'trial_status': trial_status['trial_status'],
+            'can_start_trial': trial_status['can_start_trial'],
+            'days_remaining': trial_status['days_remaining'],
+            'trial_expires_at': trial_status['trial_expires_at'],
+            'trial_started_at': trial_status['trial_started_at']
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"Error getting user status: {e}")
+        return jsonify({
+            'error': f'Failed to get user status: {str(e)}'
+        }), 500
+
+@app.route('/api/trial-eligibility', methods=['GET'])
+@token_required
+def trial_eligibility_endpoint(decoded_token):
+    """Check if user is eligible to start a Premium trial"""
+    try:
+        user_email = decoded_token.get('email')
+        user_id = decoded_token.get('sub')
+        
+        if not user_email or not user_id:
+            return jsonify({
+                'eligible': False,
+                'reason': 'User identification not found in token'
+            }), 400
+        
+        eligibility = validate_trial_eligibility(user_email, user_id)
+        return jsonify(eligibility)
+        
+    except Exception as e:
+        print(f"Error checking trial eligibility: {e}")
+        return jsonify({
+            'eligible': False,
+            'reason': f'Error: {str(e)}'
+        }), 500
+
+@app.route('/api/admin/expire-trials', methods=['POST'])
+@token_required
+def expire_trials_endpoint(decoded_token):
+    """Admin endpoint to manually process expired trials"""
+    try:
+        user_groups = decoded_token.get('cognito:groups', [])
+        
+        # Check if user has admin privileges (you can modify this logic)
+        if 'admin' not in user_groups and 'premium-tier' not in user_groups:
+            return jsonify({
+                'success': False,
+                'error': 'Insufficient privileges'
+            }), 403
+        
+        result = process_expired_trials()
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error processing expired trials: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to process expired trials: {str(e)}'
+        }), 500
+
+# --- Setup and Initialization Functions ---
+
+def ensure_premium_trial_group():
+    """Ensure the premium-trial Cognito group exists"""
+    try:
+        from cognito_utils import ensure_trial_group_exists, validate_cognito_setup
+        
+        # Create premium-trial group if it doesn't exist
+        ensure_trial_group_exists()
+        
+        # Validate all required groups exist
+        validation = validate_cognito_setup()
+        if validation['valid']:
+            print("✅ All required Cognito groups are available")
+        else:
+            print(f"⚠️ Missing Cognito groups: {validation.get('missing_groups', [])}")
+            
+    except Exception as e:
+        print(f"Warning: Could not validate Cognito setup: {e}")
+
+# Initialize Cognito groups on startup
+ensure_premium_trial_group()
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
