@@ -934,20 +934,27 @@ const AppContent = ({ user, signOut }) => {
           });
           
           if (response.ok) {
-            const userData = await response.json();
-            setTrialStatus(userData.trial_status);
-            setTrialDaysRemaining(userData.days_remaining || 0);
-            setCanStartTrial(userData.can_start_trial || false);
-            
-            // Use backend tier information as primary source
-            if (userData.tier === 'Premium' || userGroups.includes('premium-tier')) {
-                setTier('Premium');
-            } else if (userData.tier === 'Premium-Trial' || userGroups.includes('premium-trial')) {
-                setTier('Premium-Trial');
-            } else {
-                setTier('Free');
+            try {
+              const userData = await response.json();
+              setTrialStatus(userData.trial_status);
+              setTrialDaysRemaining(userData.days_remaining || 0);
+              setCanStartTrial(userData.can_start_trial || false);
+              
+              // Use backend tier information as primary source
+              if (userData.tier === 'Premium' || userGroups.includes('premium-tier')) {
+                  setTier('Premium');
+              } else if (userData.tier === 'Premium-Trial' || userGroups.includes('premium-trial')) {
+                  setTier('Premium-Trial');
+              } else {
+                  setTier('Free');
+              }
+              return true; // Success
+            } catch (jsonError) {
+              console.error('Error parsing user status JSON:', jsonError);
+              // Fall through to JWT fallback
             }
-            return true; // Success
+          } else {
+            console.error('User status API response not ok:', response.status, response.statusText);
           }
         }
         
@@ -1189,9 +1196,22 @@ This message was sent using FileShare Plus. Experience secure file sharing today
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to start trial' };
+        }
+        throw new Error(errorData.error || 'Failed to start trial');
+      }
+      
       const data = await response.json();
       
-      if (!response.ok) throw new Error(data.error || 'Failed to start trial');
+      // Wait a moment for backend to process the group changes
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Refresh user status from backend to get updated tier
       const refreshed = await refreshUserStatus();
@@ -1204,12 +1224,12 @@ This message was sent using FileShare Plus. Experience secure file sharing today
         setTrialDaysRemaining(data.days_remaining || 30);
         setCanStartTrial(false);
         setTrialStatus('active');
-        setUploadMessage(`🎉 Premium trial started! You now have ${data.days_remaining || 30} days of Premium features!`);
+        setUploadMessage(`🎉 Premium trial started! You now have ${data.days_remaining || 30} days of Premium features! Please refresh if you don't see the Premium interface.`);
       }
       
     } catch (error) {
       console.error('An error occurred starting trial:', error);
-      setUploadMessage(`Error: ${error.message}`);
+      setUploadMessage(`Error starting trial: ${error.message}`);
     }
   };
 
@@ -1292,7 +1312,6 @@ This message was sent using FileShare Plus. Experience secure file sharing today
                   Try Premium - Free for 30 days
                 </Button>
                 <Button 
-                  onClick={handleUpgrade} 
                   variation="link" 
                   isFullWidth={true}
                   color="var(--amplify-colors-font-tertiary)"
