@@ -918,6 +918,14 @@ def test_imports():
     except Exception as e:
         results['simple_trial_functions'] = f'FAILED: {str(e)}'
     
+    # Test the simple_start_trial_fallback function
+    try:
+        # Just test if we can call the function (don't actually execute it)
+        fallback_callable = callable(simple_start_trial_fallback)
+        results['fallback_function'] = f'SUCCESS - callable: {fallback_callable}'
+    except Exception as e:
+        results['fallback_function'] = f'FAILED: {str(e)}'
+    
     return jsonify({
         'success': True,
         'imports': results
@@ -928,28 +936,45 @@ def test_imports():
 def start_trial_endpoint(decoded_token):
     """Start a 30-day Premium trial for the user"""
     # Enhanced logging for debugging
-    print(f"[DEBUG] start_trial_endpoint called")
+    print(f"[DEBUG] start_trial_endpoint called at {datetime.now()}")
+    print(f"[DEBUG] decoded_token type: {type(decoded_token)}")
     print(f"[DEBUG] decoded_token keys: {list(decoded_token.keys()) if decoded_token else 'None'}")
     
     try:
         user_email = decoded_token.get('email')
         user_id = decoded_token.get('sub')
         
-        print(f"[DEBUG] user_email: {user_email}, user_id: {user_id}")
+        print(f"[DEBUG] Extracted - user_email: {user_email}, user_id: {user_id}")
         
         if not user_email or not user_id:
             print(f"[ERROR] Missing user identification in token")
+            print(f"[ERROR] Token contents: {decoded_token}")
             return jsonify({
                 'success': False,
-                'error': 'User identification not found in token'
+                'error': 'User identification not found in token',
+                'debug_info': {
+                    'token_keys': list(decoded_token.keys()) if decoded_token else [],
+                    'email_present': bool(user_email),
+                    'id_present': bool(user_id)
+                }
             }), 400
 
         # Always use fallback approach since original imports are broken
-        print(f"[DEBUG] Using fallback trial start for {user_email} (bypass complex imports)")
-        result = simple_start_trial_fallback(user_email, user_id)
-        print(f"[DEBUG] Fallback trial result: {result}")
+        print(f"[DEBUG] About to call fallback for {user_email}")
+        try:
+            result = simple_start_trial_fallback(user_email, user_id)
+            print(f"[DEBUG] Fallback returned: {result}")
+        except Exception as fallback_error:
+            print(f"[FALLBACK ERROR] Exception in fallback: {fallback_error}")
+            import traceback
+            print(f"[FALLBACK ERROR] Traceback: {traceback.format_exc()}")
+            return jsonify({
+                'success': False,
+                'error': f'Fallback function failed: {str(fallback_error)}',
+                'fallback_traceback': traceback.format_exc()
+            }), 500
         
-        if result['success']:
+        if result and result.get('success'):
             print(f"[SUCCESS] Trial started successfully for {user_email}")
             return jsonify({
                 'success': True,
@@ -958,10 +983,11 @@ def start_trial_endpoint(decoded_token):
                 'days_remaining': result['trial_status']['days_remaining']
             })
         else:
-            print(f"[ERROR] Trial start failed: {result['error']}")
+            print(f"[ERROR] Trial start failed: {result}")
             return jsonify({
                 'success': False,
-                'error': result['error']
+                'error': result.get('error', 'Unknown error in trial start'),
+                'debug_result': result
             }), 400
             
     except Exception as e:
@@ -1118,3 +1144,25 @@ ensure_trial_columns()
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+@app.route('/api/debug/test-fallback', methods=['GET'])
+def test_fallback():
+    """Test the fallback trial logic without authentication"""
+    try:
+        # Test the fallback function directly
+        test_email = "test@example.com"
+        test_user_id = "test-user-123"
+        
+        result = simple_start_trial_fallback(test_email, test_user_id)
+        
+        return jsonify({
+            'success': True,
+            'fallback_test': result,
+            'message': 'Fallback function test completed'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Fallback test failed: {str(e)}',
+            'exception_type': type(e).__name__
+        }), 500
