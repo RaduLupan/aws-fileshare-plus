@@ -187,22 +187,24 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 - [x] **Test**: Color coding (green=valid, red=expired)
 - [x] **Test**: Default 3-day selection works
 - [x] **Test**: Real-time updates after link generation
+- [x] **Test**: New file upload gets correct default expiration
+- [x] **Test**: Dropdown duration changes work correctly
 - [x] **Bug Found & Fixed**: Math.ceil() causing +1 day display error
-- [x] **Status**: ✅ In Progress
+- [x] **Status**: ✅ Complete
 
 ### **4.2 Edge Case Testing**
-- [ ] **Test**: Links expiring today (boundary case)
+- [x] **Test**: Links expiring today (boundary case) - "1 day" working
 - [ ] **Test**: Very old expired links
 - [ ] **Test**: Invalid expiration days (should default to 3)
 - [ ] **Test**: Network failures during link generation
-- [ ] **Status**: ❌ Not Started
+- [x] **Status**: ⏳ In Progress
 
 ### **4.3 UI/UX Polish**
 - [x] **Test**: Ensure dropdown UX is smooth
 - [x] **Test**: Verify table layout doesn't break on different screen sizes
-- [ ] **Test**: Test color contrast for accessibility
-- [ ] **Test**: Add loading indicators if needed
-- [ ] **Status**: ⏳ In Progress
+- [x] **Test**: Color contrast for accessibility (green/red clearly visible)
+- [x] **Test**: Loading states work correctly
+- [x] **Status**: ✅ Complete
 
 ---
 
@@ -213,12 +215,14 @@ Enhance the Premium File Explorer with advanced link expiration management, incl
 - **Root Cause**: `Math.ceil()` rounding up fractional hours (3.01 days → 4 days)
 - **Fix**: Changed to `Math.round()` for accurate day calculation
 - **Status**: ✅ Fixed and committed
-- **Testing**: Verified 3-day link now correctly shows "3 days"
+- **Testing**: ✅ Verified 3-day link now correctly shows "3 days"
+- **Verification**: ✅ 5-day links show "5 days", 1-day links show "1 day"
 
 ### **Deployment Status**
 - **Backend**: ✅ Deployed (includes database migration)
-- **Frontend**: ✅ Deployed + Bug Fix Needed
+- **Frontend**: ✅ Deployed + Bug Fix Applied
 - **Testing Environment**: https://cf.aws.lupan.ca
+- **Status**: ✅ All core functionality working correctly
 
 ---
 
