@@ -451,11 +451,22 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken, trialDaysRemain
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      const data = await response.json();
-      
+      // Check if response is OK before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to load files');
+        // Try to get error message from response
+        let errorMessage = `Failed to load files (${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, use the status text
+          errorMessage = `Failed to load files: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      // Only parse JSON if response is OK
+      const data = await response.json();
 
       setFiles(data.files || []);
       setMessage(`Found ${data.total_count} files`);
@@ -608,11 +619,19 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken, trialDaysRemain
         })
       });
 
-      const data = await response.json();
-      
+      // Check if response is OK before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to generate new link');
+        let errorMessage = `Failed to generate new link (${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = `Failed to generate new link: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
 
       // Copy link to clipboard
       await navigator.clipboard.writeText(data.download_url);
@@ -646,11 +665,19 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken, trialDaysRemain
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      const data = await response.json();
-      
+      // Check if response is OK before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete file');
+        let errorMessage = `Failed to delete file (${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = `Failed to delete file: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
 
       setMessage(`File "${filename}" deleted successfully!`);
       setTimeout(() => setMessage(''), 3000);
@@ -686,11 +713,19 @@ const PremiumFileExplorer = ({ signOut, user, tier, getJwtToken, trialDaysRemain
         })
       });
 
-      const data = await response.json();
-      
+      // Check if response is OK before parsing JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to generate download link');
+        let errorMessage = `Failed to generate download link (${response.status})`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = `Failed to generate download link: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
 
       // Create email content
       const subject = `🔗 File shared with you via FileShare Plus: ${filename}`;
