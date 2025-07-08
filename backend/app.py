@@ -419,6 +419,7 @@ def list_user_files(decoded_token):
             Bucket=S3_BUCKET_NAME,
             Prefix=f"{user_folder}/"
         )
+        print(f"S3 response received: {response.get('ResponseMetadata', {}).get('HTTPStatusCode')}")
         
         files = []
         user_email = decoded_token.get('email', 'unknown')
@@ -485,16 +486,34 @@ def list_user_files(decoded_token):
         # Sort files by last modified (newest first)
         files.sort(key=lambda x: x['last_modified'], reverse=True)
         
-        print(f"Found {len(files)} files for user {user_folder}")
-        return jsonify({
+        result = {
             'files': files,
             'total_count': len(files),
             'user_folder': user_folder
-        })
+        }
+        
+        print(f"Found {len(files)} files for user {user_folder}")
+        print(f"Returning JSON response: {json.dumps(result, indent=2)}")
+        return jsonify(result)
+        
+    except Exception as e:
+        result = {
+            'files': files,
+            'total_count': len(files),
+            'user_folder': user_folder
+        }
+        
+        print(f"Found {len(files)} files for user {user_folder}")
+        print(f"Returning JSON response: {json.dumps(result, indent=2)}")
+        return jsonify(result)
         
     except Exception as e:
         print(f"Error listing files for user {user_folder}: {e}")
-        return jsonify({'message': f'Error retrieving files: {e}'}), 500
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        error_response = {'message': f'Error retrieving files: {str(e)}'}
+        print(f"Returning error JSON: {json.dumps(error_response)}")
+        return jsonify(error_response), 500
 
 
 @app.route("/api/files/new-link", methods=['POST'])
@@ -890,6 +909,60 @@ def expire_trials_endpoint(decoded_token):
             'success': False,
             'error': f'Failed to process expired trials: {str(e)}'
         }), 500
+
+# --- NEW: Test Endpoints for Verification ---
+
+@app.route("/api/test", methods=['GET'])
+def test_endpoint():
+    """Simple test endpoint to verify JSON responses"""
+    return jsonify({
+        'status': 'success',
+        'message': 'Backend is working and returning JSON',
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.route("/api/test-auth", methods=['GET'])
+@token_required
+def test_auth_endpoint(decoded_token):
+    """Test endpoint to verify authentication and JSON responses"""
+    return jsonify({
+        'status': 'success',
+        'message': 'Authentication working and returning JSON',
+        'user_email': decoded_token.get('email'),
+        'user_groups': decoded_token.get('cognito:groups', []),
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.route("/api/files-test", methods=['GET'])
+@token_required
+def test_files_endpoint(decoded_token):
+    """Minimal files endpoint for testing JSON responses"""
+    try:
+        user_groups = decoded_token.get('cognito:groups', [])
+        user_email = decoded_token.get('email')
+        
+        print(f"TEST FILES: User {user_email} with groups {user_groups}")
+        
+        # Check if user has premium access
+        if 'premium-tier' not in user_groups and 'premium-trial' not in user_groups:
+            return jsonify({'message': 'Premium feature - please upgrade your account'}), 403
+        
+        # Return a simple test response
+        return jsonify({
+            'status': 'success',
+            'message': 'Files endpoint working',
+            'user_email': user_email,
+            'user_groups': user_groups,
+            'files': [],
+            'total_count': 0
+        })
+        
+    except Exception as e:
+        print(f"Error in test files endpoint: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'message': f'Error: {str(e)}'}), 500
+
 
 # --- Global Error Handlers to Ensure JSON Responses ---
 @app.errorhandler(404)
