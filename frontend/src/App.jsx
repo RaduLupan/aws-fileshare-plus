@@ -919,44 +919,57 @@ const AppContent = ({ user, signOut }) => {
   const [trialDaysRemaining, setTrialDaysRemaining] = useState(0);
   const [canStartTrial, setCanStartTrial] = useState(false);
 
-  // Function to get the user's tier from their JWT and trial status
-  useEffect(() => {
-    const getUserTierAndTrialStatus = async () => {
-        try {
-            const { tokens } = await fetchAuthSession();
-            const userGroups = tokens?.accessToken.payload['cognito:groups'] || [];
+  // Function to refresh user tier and trial status
+  const refreshUserStatus = async () => {
+    try {
+        const { tokens } = await fetchAuthSession();
+        const userGroups = tokens?.accessToken.payload['cognito:groups'] || [];
+        
+        // Get user status from backend (more reliable than JWT groups)
+        const token = tokens?.idToken?.toString();
+        if (token) {
+          const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
+          const response = await fetch(`${apiUrl}/api/user-status`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            setTrialStatus(userData.trial_status);
+            setTrialDaysRemaining(userData.days_remaining || 0);
+            setCanStartTrial(userData.can_start_trial || false);
             
-            // Get user status from backend
-            const token = tokens?.idToken?.toString();
-            if (token) {
-              const apiUrl = import.meta.env.VITE_BACKEND_API_URL;
-              const response = await fetch(`${apiUrl}/api/user-status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-              
-              if (response.ok) {
-                const userData = await response.json();
-                setTrialStatus(userData.trial_status);
-                setTrialDaysRemaining(userData.days_remaining || 0);
-                setCanStartTrial(userData.can_start_trial || false);
-              }
-            }
-            
-            // Determine tier from groups
-            if (userGroups.includes('premium-tier')) {
+            // Use backend tier information as primary source
+            if (userData.tier === 'Premium' || userGroups.includes('premium-tier')) {
                 setTier('Premium');
-            } else if (userGroups.includes('premium-trial')) {
+            } else if (userData.tier === 'Premium-Trial' || userGroups.includes('premium-trial')) {
                 setTier('Premium-Trial');
             } else {
                 setTier('Free');
             }
-        } catch (error) {
-            console.error('Error getting user tier and trial status:', error);
-            setTier('Free'); // Default to free on error
+            return true; // Success
+          }
         }
-    };
+        
+        // Fallback to JWT groups if backend call fails
+        if (userGroups.includes('premium-tier')) {
+            setTier('Premium');
+        } else if (userGroups.includes('premium-trial')) {
+            setTier('Premium-Trial');
+        } else {
+            setTier('Free');
+        }
+        return false; // Failed to get backend data
+    } catch (error) {
+        console.error('Error getting user tier and trial status:', error);
+        setTier('Free'); // Default to free on error
+        return false;
+    }
+  };
 
-    getUserTierAndTrialStatus();
+  // Function to get the user's tier from their JWT and trial status
+  useEffect(() => {
+    refreshUserStatus();
   }, []);
 
   // Function to get JWT token for backend requests
@@ -1180,8 +1193,19 @@ This message was sent using FileShare Plus. Experience secure file sharing today
       
       if (!response.ok) throw new Error(data.error || 'Failed to start trial');
       
-      setUploadMessage('🎉 Premium trial started! Please sign out and sign back in to access Premium features.');
-      setCanStartTrial(false);
+      // Refresh user status from backend to get updated tier
+      const refreshed = await refreshUserStatus();
+      
+      if (refreshed) {
+        setUploadMessage(`🎉 Premium trial started! You now have ${data.days_remaining || 30} days of Premium features!`);
+      } else {
+        // Fallback: manually update state
+        setTier('Premium-Trial');
+        setTrialDaysRemaining(data.days_remaining || 30);
+        setCanStartTrial(false);
+        setTrialStatus('active');
+        setUploadMessage(`🎉 Premium trial started! You now have ${data.days_remaining || 30} days of Premium features!`);
+      }
       
     } catch (error) {
       console.error('An error occurred starting trial:', error);

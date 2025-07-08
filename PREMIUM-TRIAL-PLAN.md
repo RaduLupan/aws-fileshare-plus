@@ -375,7 +375,7 @@ const [userStatus, setUserStatus] = useState({
 - [x] Edge cases handled
 
 ### **Deployment Ready**
-- [ ] Code committed to dev branch
+- [x] Code committed to dev branch
 - [ ] Backend deployed and verified
 - [ ] Frontend deployed and verified
 - [ ] End-to-end testing completed

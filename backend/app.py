@@ -796,8 +796,12 @@ def user_status_endpoint(decoded_token):
         # Get trial status from database
         trial_status = get_user_trial_status(user_email, user_id)
         
-        # Determine user tier from Cognito groups (more reliable)
-        if 'premium-tier' in user_groups:
+        # Determine user tier - prioritize database over JWT groups
+        database_tier = trial_status.get('user_tier', 'Free')
+        
+        if database_tier == 'Premium-Trial':
+            current_tier = 'Premium-Trial'
+        elif database_tier == 'Premium' or 'premium-tier' in user_groups:
             current_tier = 'Premium'
         elif 'premium-trial' in user_groups:
             current_tier = 'Premium-Trial'
