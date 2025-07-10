@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Utility script to reset a user's trial status
+Utility script to reset a user's trial status for troubleshooting
 """
 
 import sqlite3
@@ -42,12 +42,6 @@ def reset_user_trial(email):
             
             if cursor.rowcount > 0:
                 print(f"Successfully reset trial status for {email}")
-                
-                # Verify the reset
-                cursor.execute('SELECT user_tier, trial_used, trial_started_at, trial_expires_at FROM users WHERE email = ?', (email,))
-                updated_user = cursor.fetchone()
-                print(f"Updated user status: tier={updated_user[0]}, trial_used={updated_user[1]}, trial_started={updated_user[2]}, trial_expires={updated_user[3]}")
-                
                 return True
             else:
                 print(f"No rows updated for {email}")
@@ -62,20 +56,18 @@ def list_all_users():
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT user_id, email, user_tier, trial_used, trial_started_at, trial_expires_at FROM users')
+            cursor.execute('SELECT user_id, email, user_tier, trial_used FROM users')
             users = cursor.fetchall()
             
             print("All users in database:")
-            print("-" * 80)
+            print("-" * 60)
             for user in users:
-                user_id, email, tier, trial_used, trial_started, trial_expires = user
+                user_id, email, tier, trial_used = user
                 print(f"ID: {user_id}")
                 print(f"Email: {email}")
                 print(f"Tier: {tier}")
                 print(f"Trial Used: {trial_used}")
-                print(f"Trial Started: {trial_started}")
-                print(f"Trial Expires: {trial_expires}")
-                print("-" * 40)
+                print("-" * 30)
                 
     except Exception as e:
         print(f"Error listing users: {e}")
@@ -83,9 +75,8 @@ def list_all_users():
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python3 reset_user_trial.py list                   # List all users")
-        print("  python3 reset_user_trial.py reset <email>         # Reset trial for specific user")
-        print("  python3 reset_user_trial.py reset radu@lupan.ca   # Example")
+        print("  python3 reset_user_trial.py list")
+        print("  python3 reset_user_trial.py reset <email>")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -96,10 +87,9 @@ if __name__ == "__main__":
         email = sys.argv[2]
         success = reset_user_trial(email)
         if success:
-            print(f"\n✅ Trial status reset successfully for {email}")
-            print("The user should now be able to start a trial.")
+            print(f"\n✅ Trial status reset for {email}")
         else:
             print(f"\n❌ Failed to reset trial status for {email}")
     else:
-        print("Invalid command. Use 'list' or 'reset <email>'")
+        print("Invalid command")
         sys.exit(1)
