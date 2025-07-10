@@ -62,9 +62,21 @@ JWKS_URL = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_I
 # Fetch the JWKS once when the application starts.
 # In a real production app, you might cache this with a TTL.
 try:
-    jwks = requests.get(JWKS_URL).json()["keys"]
+    print(f"Fetching JWKS from: {JWKS_URL}")
+    jwks_response = requests.get(JWKS_URL)
+    jwks_response.raise_for_status()
+    jwks_data = jwks_response.json()
+    print(f"JWKS response: {jwks_data}")
+    jwks = jwks_data["keys"]
+    print(f"Successfully loaded {len(jwks)} keys from JWKS")
 except requests.exceptions.RequestException as e:
     print(f"Error fetching JWKS: {e}")
+    jwks = []
+except KeyError as e:
+    print(f"Error parsing JWKS response - missing 'keys' field: {e}")
+    jwks = []
+except Exception as e:
+    print(f"Unexpected error fetching JWKS: {e}")
     jwks = []
 
 
@@ -74,7 +86,7 @@ def rsa_key_to_pem(rsa_key_dict):
         # Properly pad base64url encoded values
         def pad_base64(s):
             """Add proper padding to base64 string"""
-            return s + '=' * (4 - len(s) % 4) % 4
+            return s + '=' * ((4 - len(s) % 4) % 4)
         
         # Decode base64url encoded values with proper padding
         n = base64.urlsafe_b64decode(pad_base64(rsa_key_dict['n']))
@@ -84,7 +96,7 @@ def rsa_key_to_pem(rsa_key_dict):
         n_int = int.from_bytes(n, byteorder='big')
         e_int = int.from_bytes(e, byteorder='big')
         
-        # Create RSA public key
+        # Create RSA public key - note: RSAPublicNumbers takes (e, n) not (e_int, n_int)
         public_key = rsa.RSAPublicNumbers(e_int, n_int).public_key()
         
         # Serialize to PEM format
@@ -96,6 +108,8 @@ def rsa_key_to_pem(rsa_key_dict):
         return pem.decode('utf-8')
     except Exception as e:
         print(f"Error converting RSA key to PEM: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return None
 
 
