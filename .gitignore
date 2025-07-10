@@ -37,3 +37,11 @@ dist/
 .env.local
 .env.development
 .env.production
+
+# Python bytecode files
+*.pyc
+__pycache__/
+
+# Database files (adjust if your DB file has a different name/extension)
+*.db
+*.sqlite3
