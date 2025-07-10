@@ -54,7 +54,7 @@ def create_short_url(full_url, user_email=None, file_key=None, filename=None, ex
     Returns:
         dict with short_code and created status
     """
-    cleanup_expired_urls()  # Clean up old URLs first
+    # Note: Cleanup operations moved to scheduled background task for better performance
     
     try:
         with get_db_connection() as conn:
@@ -127,7 +127,7 @@ def get_full_url(short_code):
     Returns:
         dict with full_url and metadata, or None if not found
     """
-    cleanup_expired_urls()  # Clean up old URLs first
+    # Note: Cleanup operations moved to scheduled background task for better performance
     
     try:
         with get_db_connection() as conn:
@@ -181,7 +181,7 @@ def get_user_urls(user_email, limit=100):
     Returns:
         List of URL mappings
     """
-    cleanup_expired_urls()  # Clean up old URLs first
+    # Note: Cleanup operations moved to scheduled background task for better performance
     
     try:
         with get_db_connection() as conn:
@@ -235,3 +235,16 @@ def delete_short_url(short_code, user_email):
     except Exception as e:
         logger.error(f"Failed to delete short URL {short_code}: {e}")
         return False
+
+def scheduled_cleanup():
+    """
+    Periodic cleanup function that should be called by a scheduled task
+    Returns the number of URLs cleaned up
+    """
+    try:
+        deleted_count = cleanup_expired_urls()
+        logger.info(f"Scheduled cleanup completed: {deleted_count} expired URLs removed")
+        return deleted_count
+    except Exception as e:
+        logger.error(f"Scheduled cleanup failed: {e}")
+        return 0
