@@ -5,11 +5,12 @@ from flask_cors import CORS
 import boto3
 import os
 import jwt
+from jwt import PyJWKClient
+from jose import jwt as jose_jwt
+from jose.exceptions import JWTError
 import requests
 import json
 from functools import wraps
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
 import re
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url, scheduled_cleanup
@@ -59,58 +60,88 @@ COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID')
 # Construct the URL for the JSON Web Key Set (JWKS)
 # This is used to get the public keys needed to verify the JWTs.
 JWKS_URL = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
-# Fetch the JWKS once when the application starts.
-# In a real production app, you might cache this with a TTL.
-try:
-    print(f"Fetching JWKS from: {JWKS_URL}")
-    jwks_response = requests.get(JWKS_URL)
-    jwks_response.raise_for_status()
-    jwks_data = jwks_response.json()
-    print(f"JWKS response: {jwks_data}")
-    jwks = jwks_data["keys"]
-    print(f"Successfully loaded {len(jwks)} keys from JWKS")
-except requests.exceptions.RequestException as e:
-    print(f"Error fetching JWKS: {e}")
-    jwks = []
-except KeyError as e:
-    print(f"Error parsing JWKS response - missing 'keys' field: {e}")
-    jwks = []
-except Exception as e:
-    print(f"Unexpected error fetching JWKS: {e}")
-    jwks = []
 
-
-def rsa_key_to_pem(rsa_key_dict):
-    """Convert RSA key components (n, e) to PEM format for PyJWT"""
+# Initialize JWKS client for PyJWT
+jwks_client = None
+if AWS_REGION and COGNITO_USER_POOL_ID:
     try:
-        # Properly pad base64url encoded values
-        def pad_base64(s):
-            """Add proper padding to base64 string"""
-            return s + '=' * ((4 - len(s) % 4) % 4)
-        
-        # Decode base64url encoded values with proper padding
-        n = base64.urlsafe_b64decode(pad_base64(rsa_key_dict['n']))
-        e = base64.urlsafe_b64decode(pad_base64(rsa_key_dict['e']))
-        
-        # Convert bytes to integers
-        n_int = int.from_bytes(n, byteorder='big')
-        e_int = int.from_bytes(e, byteorder='big')
-        
-        # Create RSA public key - note: RSAPublicNumbers takes (e, n) not (e_int, n_int)
-        public_key = rsa.RSAPublicNumbers(e_int, n_int).public_key()
-        
-        # Serialize to PEM format
-        pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        
-        return pem.decode('utf-8')
+        print(f"Initializing JWKS client with URL: {JWKS_URL}")
+        jwks_client = PyJWKClient(JWKS_URL)
+        print("JWKS client initialized successfully")
     except Exception as e:
-        print(f"Error converting RSA key to PEM: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        return None
+        print(f"Error initializing JWKS client: {e}")
+        jwks_client = None
+else:
+    print("Warning: AWS_REGION or COGNITO_USER_POOL_ID not set - JWT validation will fail")
+
+
+def verify_jwt_token(token):
+    """
+    Verify JWT token using both PyJWT and python-jose as fallback
+    Returns decoded token if valid, raises exception if invalid
+    """
+    if not jwks_client:
+        raise jwt.InvalidTokenError("JWKS client not initialized")
+    
+    # Method 1: Try PyJWT with PyJWKClient (recommended)
+    try:
+        # Get the signing key from the JWT token
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        # Decode and verify the token
+        decoded_token = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=COGNITO_CLIENT_ID,
+            issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}",
+            options={
+                "verify_signature": True,
+                "verify_aud": True,
+                "verify_iss": True,
+                "verify_exp": True
+            }
+        )
+        print("JWT successfully verified using PyJWT")
+        return decoded_token
+        
+    except Exception as pyjwt_error:
+        print(f"PyJWT verification failed: {pyjwt_error}")
+        
+        # Method 2: Fallback to python-jose
+        try:
+            # Fetch JWKS for jose
+            jwks_response = requests.get(JWKS_URL)
+            jwks_response.raise_for_status()
+            jwks_data = jwks_response.json()
+            
+            # Get token header to find the correct key
+            unverified_header = jose_jwt.get_unverified_header(token)
+            
+            # Find the key that matches the kid
+            rsa_key = None
+            for key in jwks_data["keys"]:
+                if key["kid"] == unverified_header["kid"]:
+                    rsa_key = key
+                    break
+            
+            if not rsa_key:
+                raise jwt.InvalidTokenError("Unable to find appropriate key")
+            
+            # Verify the token using python-jose
+            decoded_token = jose_jwt.decode(
+                token,
+                rsa_key,
+                algorithms=["RS256"],
+                audience=COGNITO_CLIENT_ID,
+                issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+            )
+            print("JWT successfully verified using python-jose")
+            return decoded_token
+            
+        except Exception as jose_error:
+            print(f"python-jose verification also failed: {jose_error}")
+            raise jwt.InvalidTokenError(f"Token verification failed with both methods: PyJWT({pyjwt_error}), jose({jose_error})")
 
 
 # --- NEW: JWT Validation Decorator ---
@@ -141,59 +172,18 @@ def token_required(f):
             return jsonify({'message': 'Token is missing!'}), 401
         
         try:
-            # Get the unverified header from the token
-            unverified_header = jwt.get_unverified_header(token)
+            # Use the new robust JWT verification function
+            decoded_token = verify_jwt_token(token)
             
-            # Find the correct public key to use for validation
-            rsa_key = {}
-            for key in jwks:
-                if key["kid"] == unverified_header["kid"]:
-                    rsa_key = {
-                        "kty": key["kty"],
-                        "kid": key["kid"],
-                        "use": key["use"],
-                        "n": key["n"],
-                        "e": key["e"]
-                    }
-            
-            if not rsa_key:
-                 return jsonify({'message': 'Public key not found'}), 401
-              # Convert RSA key components to PEM format
-            pem_key = rsa_key_to_pem(rsa_key)
-            if not pem_key:
-                return jsonify({'message': 'Failed to process public key'}), 401
-            
-            # Add comprehensive debug logging
-            unverified_header = jwt.get_unverified_header(token)
-            unverified_payload = jwt.decode(token, options={"verify_signature": False})
-            
+            # Add debug logging
             print("=== JWT DEBUG INFO ===")
-            print(f"Token header: {json.dumps(unverified_header, indent=2)}")
-            print(f"Token payload: {json.dumps(unverified_payload, indent=2)}")
-            print(f"Token audience (aud): {unverified_payload.get('aud')}")
-            print(f"Token issuer (iss): {unverified_payload.get('iss')}")
-            print(f"Token expiration (exp): {unverified_payload.get('exp')}")
-            print(f"Token use (token_use): {unverified_payload.get('token_use')}")
+            print(f"Token audience (aud): {decoded_token.get('aud')}")
+            print(f"Token issuer (iss): {decoded_token.get('iss')}")
+            print(f"Token expiration (exp): {decoded_token.get('exp')}")
+            print(f"Token use (token_use): {decoded_token.get('token_use')}")
             print(f"Expected audience (COGNITO_CLIENT_ID): {COGNITO_CLIENT_ID}")
             print(f"Expected issuer: https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}")
             print("=== END JWT DEBUG INFO ===")
-            
-            # Proper JWT validation with security checks enabled
-            expected_issuer = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
-            
-            decoded_token = jwt.decode(
-                token,
-                pem_key,
-                algorithms=["RS256"],
-                audience=COGNITO_CLIENT_ID,
-                issuer=expected_issuer,
-                options={
-                    "verify_signature": True,
-                    "verify_aud": True,   # Enable audience validation
-                    "verify_iss": True,   # Enable issuer validation
-                    "verify_exp": True    # Enable expiration validation
-                }
-            )
 
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
