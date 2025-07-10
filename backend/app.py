@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import base64
 import re
-from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url
+from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url, scheduled_cleanup
 from database import init_database
 # NOTE: user_management imports moved to runtime to prevent startup crashes
 # from user_management import (
@@ -71,9 +71,14 @@ except requests.exceptions.RequestException as e:
 def rsa_key_to_pem(rsa_key_dict):
     """Convert RSA key components (n, e) to PEM format for PyJWT"""
     try:
-        # Decode base64url encoded values
-        n = base64.urlsafe_b64decode(rsa_key_dict['n'] + '==')  # Add padding if needed
-        e = base64.urlsafe_b64decode(rsa_key_dict['e'] + '==')  # Add padding if needed
+        # Properly pad base64url encoded values
+        def pad_base64(s):
+            """Add proper padding to base64 string"""
+            return s + '=' * (4 - len(s) % 4) % 4
+        
+        # Decode base64url encoded values with proper padding
+        n = base64.urlsafe_b64decode(pad_base64(rsa_key_dict['n']))
+        e = base64.urlsafe_b64decode(pad_base64(rsa_key_dict['e']))
         
         # Convert bytes to integers
         n_int = int.from_bytes(n, byteorder='big')
@@ -159,16 +164,20 @@ def token_required(f):
             print(f"Expected issuer: https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}")
             print("=== END JWT DEBUG INFO ===")
             
-            # Simplify JWT validation - ONLY verify signature for now
+            # Proper JWT validation with security checks enabled
+            expected_issuer = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+            
             decoded_token = jwt.decode(
                 token,
                 pem_key,
                 algorithms=["RS256"],
+                audience=COGNITO_CLIENT_ID,
+                issuer=expected_issuer,
                 options={
                     "verify_signature": True,
-                    "verify_aud": False,  # Explicitly disable audience validation
-                    "verify_iss": False,  # Explicitly disable issuer validation
-                    "verify_exp": False   # Explicitly disable expiration validation
+                    "verify_aud": True,   # Enable audience validation
+                    "verify_iss": True,   # Enable issuer validation
+                    "verify_exp": True    # Enable expiration validation
                 }
             )
 
@@ -1214,6 +1223,21 @@ def check_db_tables():
             'success': False,
             'error': f'Database check failed: {str(e)}',
             'exception_type': type(e).__name__
+        }), 500
+
+@app.route('/api/admin/cleanup-expired-urls', methods=['POST'])
+def cleanup_expired_urls_endpoint():
+    """Administrative endpoint for cleaning up expired URLs - should be called by scheduled tasks"""
+    try:
+        deleted_count = scheduled_cleanup()
+        return jsonify({
+            'message': f'Cleanup completed successfully',
+            'deleted_count': deleted_count
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'message': f'Cleanup failed: {str(e)}',
+            'deleted_count': 0
         }), 500
 
 if __name__ == "__main__":
