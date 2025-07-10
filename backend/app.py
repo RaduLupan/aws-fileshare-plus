@@ -13,6 +13,7 @@ import json
 from functools import wraps
 import base64
 import re
+import time
 from url_shortener import create_short_url, get_full_url, get_user_urls, delete_short_url, scheduled_cleanup
 from database import init_database
 # NOTE: user_management imports moved to runtime to prevent startup crashes
@@ -61,87 +62,165 @@ COGNITO_CLIENT_ID = os.environ.get('COGNITO_CLIENT_ID')
 # This is used to get the public keys needed to verify the JWTs.
 JWKS_URL = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
 
-# Initialize JWKS client for PyJWT
+# Initialize JWKS client for PyJWT with improved error handling
 jwks_client = None
-if AWS_REGION and COGNITO_USER_POOL_ID:
-    try:
-        print(f"Initializing JWKS client with URL: {JWKS_URL}")
-        jwks_client = PyJWKClient(JWKS_URL)
-        print("JWKS client initialized successfully")
-    except Exception as e:
-        print(f"Error initializing JWKS client: {e}")
-        jwks_client = None
-else:
-    print("Warning: AWS_REGION or COGNITO_USER_POOL_ID not set - JWT validation will fail")
+jwks_data_cache = None
+jwks_cache_time = None
+JWKS_CACHE_DURATION = 3600  # Cache JWKS data for 1 hour
 
+def get_or_initialize_jwks_client():
+    """Get JWKS client with lazy initialization and retry logic"""
+    global jwks_client, jwks_data_cache, jwks_cache_time
+    
+    # Check if we have required environment variables
+    if not AWS_REGION or not COGNITO_USER_POOL_ID:
+        print("Warning: AWS_REGION or COGNITO_USER_POOL_ID not set - JWT validation will fail")
+        return None
+    
+    # If client exists and is working, return it
+    if jwks_client:
+        return jwks_client
+    
+    # Try to initialize JWKS client with retry logic
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"Initializing JWKS client (attempt {attempt + 1}/{max_retries})")
+            print(f"JWKS URL: {JWKS_URL}")
+            
+            # Create new client
+            jwks_client = PyJWKClient(JWKS_URL)
+            
+            # Test the client by fetching the keys
+            # This will trigger an exception if there's a problem
+            test_response = requests.get(JWKS_URL, timeout=5)
+            test_response.raise_for_status()
+            
+            # Cache the JWKS data for fallback
+            jwks_data_cache = test_response.json()
+            jwks_cache_time = time.time()
+            
+            print("JWKS client initialized and tested successfully")
+            return jwks_client
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Network error initializing JWKS client (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("Failed to initialize JWKS client after all retries")
+                jwks_client = None
+                
+        except Exception as e:
+            print(f"Unexpected error initializing JWKS client: {e}")
+            jwks_client = None
+            break
+    
+    return None
+
+def get_cached_jwks_data():
+    """Get cached JWKS data if available and not expired"""
+    global jwks_data_cache, jwks_cache_time
+    
+    if jwks_data_cache and jwks_cache_time:
+        cache_age = time.time() - jwks_cache_time
+        if cache_age < JWKS_CACHE_DURATION:
+            print(f"Using cached JWKS data (age: {cache_age:.0f}s)")
+            return jwks_data_cache
+    
+    return None
 
 def verify_jwt_token(token):
     """
     Verify JWT token using both PyJWT and python-jose as fallback
     Returns decoded token if valid, raises exception if invalid
     """
-    if not jwks_client:
-        raise jwt.InvalidTokenError("JWKS client not initialized")
+    # Try to get or initialize JWKS client
+    client = get_or_initialize_jwks_client()
     
     # Method 1: Try PyJWT with PyJWKClient (recommended)
-    try:
-        # Get the signing key from the JWT token
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        
-        # Decode and verify the token
-        decoded_token = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            audience=COGNITO_CLIENT_ID,
-            issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}",
-            options={
-                "verify_signature": True,
-                "verify_aud": True,
-                "verify_iss": True,
-                "verify_exp": True
-            }
-        )
-        print("JWT successfully verified using PyJWT")
-        return decoded_token
-        
-    except Exception as pyjwt_error:
-        print(f"PyJWT verification failed: {pyjwt_error}")
-        
-        # Method 2: Fallback to python-jose
+    if client:
         try:
-            # Fetch JWKS for jose
-            jwks_response = requests.get(JWKS_URL)
+            # Get the signing key from the JWT token
+            signing_key = client.get_signing_key_from_jwt(token)
+            
+            # Decode and verify the token
+            decoded_token = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=COGNITO_CLIENT_ID,
+                issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}",
+                options={
+                    "verify_signature": True,
+                    "verify_aud": True,
+                    "verify_iss": True,
+                    "verify_exp": True
+                }
+            )
+            print("JWT successfully verified using PyJWT")
+            return decoded_token
+            
+        except Exception as pyjwt_error:
+            print(f"PyJWT verification failed: {pyjwt_error}")
+    else:
+        pyjwt_error = "JWKS client not available"
+    
+    # Method 2: Fallback to python-jose with cached or fresh JWKS data
+    try:
+        # Try to use cached JWKS data first
+        jwks_data = get_cached_jwks_data()
+        
+        if not jwks_data:
+            # Fetch fresh JWKS data
+            print("Fetching fresh JWKS data for fallback verification")
+            jwks_response = requests.get(JWKS_URL, timeout=5)
             jwks_response.raise_for_status()
             jwks_data = jwks_response.json()
             
-            # Get token header to find the correct key
-            unverified_header = jose_jwt.get_unverified_header(token)
-            
-            # Find the key that matches the kid
-            rsa_key = None
-            for key in jwks_data["keys"]:
-                if key["kid"] == unverified_header["kid"]:
-                    rsa_key = key
-                    break
-            
-            if not rsa_key:
-                raise jwt.InvalidTokenError("Unable to find appropriate key")
-            
-            # Verify the token using python-jose
-            decoded_token = jose_jwt.decode(
-                token,
-                rsa_key,
-                algorithms=["RS256"],
-                audience=COGNITO_CLIENT_ID,
-                issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
-            )
-            print("JWT successfully verified using python-jose")
-            return decoded_token
-            
-        except Exception as jose_error:
-            print(f"python-jose verification also failed: {jose_error}")
-            raise jwt.InvalidTokenError(f"Token verification failed with both methods: PyJWT({pyjwt_error}), jose({jose_error})")
+            # Update cache
+            global jwks_data_cache, jwks_cache_time
+            jwks_data_cache = jwks_data
+            jwks_cache_time = time.time()
+        
+        # Get token header to find the correct key
+        unverified_header = jose_jwt.get_unverified_header(token)
+        
+        # Find the key that matches the kid
+        rsa_key = None
+        for key in jwks_data["keys"]:
+            if key["kid"] == unverified_header["kid"]:
+                rsa_key = key
+                break
+        
+        if not rsa_key:
+            raise jwt.InvalidTokenError("Unable to find appropriate key in JWKS")
+        
+        # Verify the token using python-jose
+        decoded_token = jose_jwt.decode(
+            token,
+            rsa_key,
+            algorithms=["RS256"],
+            audience=COGNITO_CLIENT_ID,
+            issuer=f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+        )
+        print("JWT successfully verified using python-jose (fallback)")
+        return decoded_token
+        
+    except requests.exceptions.RequestException as network_error:
+        print(f"Network error fetching JWKS data: {network_error}")
+        raise jwt.InvalidTokenError(f"Failed to fetch public keys: {network_error}")
+        
+    except Exception as jose_error:
+        print(f"python-jose verification also failed: {jose_error}")
+        # Provide a more helpful error message
+        if "Unable to find appropriate key" in str(jose_error):
+            raise jwt.InvalidTokenError("Failed to process public key - key not found in JWKS")
+        else:
+            raise jwt.InvalidTokenError(f"Token verification failed: PyJWT({pyjwt_error}), jose({jose_error})")
 
 
 # --- NEW: JWT Validation Decorator ---
@@ -804,9 +883,12 @@ def user_status_endpoint(decoded_token):
         user_id = decoded_token.get('sub')
         user_groups = decoded_token.get('cognito:groups', [])
         
+        print(f"[USER_STATUS] Processing request for user: {user_email}, groups: {user_groups}")
+        
         if not user_email or not user_id:
             return jsonify({
-                'error': 'User identification not found in token'
+                'error': 'User identification not found in token',
+                'details': 'Email or user ID missing from JWT token'
             }), 400
         
         # Get trial status from database
@@ -906,11 +988,42 @@ def expire_trials_endpoint(decoded_token):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint"""
+    """Enhanced health check endpoint with JWT status"""
+    # Check JWT configuration status
+    jwt_status = "not_configured"
+    jwt_details = {}
+    
+    if AWS_REGION and COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID:
+        jwt_status = "configured"
+        jwt_details = {
+            'aws_region': bool(AWS_REGION),
+            'user_pool_id': bool(COGNITO_USER_POOL_ID),
+            'client_id': bool(COGNITO_CLIENT_ID),
+            'jwks_url': JWKS_URL
+        }
+        
+        # Test JWKS client availability
+        try:
+            client = get_or_initialize_jwks_client()
+            jwt_details['jwks_client_available'] = client is not None
+            jwt_details['jwks_cache_available'] = jwks_data_cache is not None
+        except Exception as e:
+            jwt_details['jwks_client_available'] = False
+            jwt_details['jwks_error'] = str(e)
+    else:
+        jwt_details = {
+            'error': 'Missing required environment variables',
+            'aws_region': bool(AWS_REGION),
+            'user_pool_id': bool(COGNITO_USER_POOL_ID),
+            'client_id': bool(COGNITO_CLIENT_ID)
+        }
+    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'version': 'v0.7.0-debug'
+        'version': 'v0.7.1-jwt-fix',
+        'jwt_status': jwt_status,
+        'jwt_details': jwt_details
     })
 
 @app.route('/api/debug/test-imports', methods=['GET'])
