@@ -923,6 +923,7 @@ def user_status_endpoint(decoded_token):
             'cognito_groups': user_groups,
             'trial_status': trial_status['trial_status'],
             'can_start_trial': trial_status['can_start_trial'],
+            'trial_days_remaining': trial_status['days_remaining'],
             'days_remaining': trial_status['days_remaining'],
             'trial_expires_at': trial_status['trial_expires_at'],
             'trial_started_at': trial_status['trial_started_at']
