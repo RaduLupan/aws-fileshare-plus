@@ -59,12 +59,12 @@ resource "aws_iam_policy" "flask_app_s3_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "AllowS3Access",
+        Sid    = "AllowS3Access",
         Effect = "Allow"
         Action = [
           "s3:PutObject",
           "s3:GetObject",
-          "s3:ListBucket", # Required for listing objects, potentially by boto3
+          "s3:ListBucket",  # Required for listing objects, potentially by boto3
           "s3:DeleteObject" # Add if your app needs to delete files
         ]
         Resource = [
@@ -73,14 +73,14 @@ resource "aws_iam_policy" "flask_app_s3_access" {
         ]
       },
       {
-        Sid: "AllowCognitoGroupManagement",
-        Effect: "Allow",
-        Action: [
+        Sid    = "AllowCognitoGroupManagement",
+        Effect = "Allow",
+        Action = [
           "cognito-idp:AdminAddUserToGroup",
           "cognito-idp:AdminRemoveUserFromGroup"
-      ],
-        Resource: "arn:aws:cognito-idp:us-east-2:481509955802:userpool/*"
-    }
+        ],
+        Resource = "arn:aws:cognito-idp:us-east-2:481509955802:userpool/*"
+      }
     ]
   })
 

@@ -43,6 +43,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads_backend_lifecycle" {
     id     = "delete_old_files"
     status = "Enabled"
 
+    # Add filter to apply to all objects
+    filter {
+      prefix = ""
+    }
+
     # Delete objects after the specified retention period
     expiration {
       days = var.file_retention_days
