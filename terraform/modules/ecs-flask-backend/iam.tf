@@ -98,7 +98,7 @@ resource "aws_iam_role_policy_attachment" "flask_app_s3_policy_attachment" {
 
 # Attach the DynamoDB access policy to the Flask application task role (if provided)
 resource "aws_iam_role_policy_attachment" "flask_app_dynamodb_policy_attachment" {
-  count      = var.dynamodb_policy_arn != "" ? 1 : 0
-  policy_arn = var.dynamodb_policy_arn
+  for_each   = var.dynamodb_policy_arn != "" ? toset([var.dynamodb_policy_arn]) : toset([])
+  policy_arn = each.value
   role       = aws_iam_role.flask_app_task.name
 }
