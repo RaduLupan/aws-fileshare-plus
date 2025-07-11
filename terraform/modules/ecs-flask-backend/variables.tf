@@ -151,3 +151,9 @@ variable "file_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "dynamodb_policy_arn" {
+  description = "The ARN of the IAM policy for DynamoDB access. If provided, will be attached to the ECS task role."
+  type        = string
+  default     = null
+}

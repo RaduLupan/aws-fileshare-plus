@@ -84,6 +84,9 @@ module "backend_app" {
   
   # Pass CloudFront domain for short URL construction
   frontend_domain = var.cloudfront_custom_domain_name != "" ? var.cloudfront_custom_domain_name : module.frontend_app.cloudfront_domain_name
+  
+  # Pass DynamoDB policy ARN for database access
+  dynamodb_policy_arn = module.dynamodb.dynamodb_policy_arn
 }
 
 module "cognito" {
@@ -106,6 +109,16 @@ module "ses_email" {
   environment        = var.environment
   domain_name        = var.ses_domain_name        # Will be set in dev.tfvars
   from_email_address = var.ses_from_email_address # Will be set in dev.tfvars
+}
+
+# Call the DynamoDB module for database tables
+module "dynamodb" {
+  source = "../../modules/dynamodb"
+
+  project_name                  = var.project_name
+  environment                   = var.environment
+  aws_region                    = var.aws_region
+  enable_point_in_time_recovery = var.enable_point_in_time_recovery
 }
 
 # Output relevant values from the modules
@@ -184,4 +197,30 @@ output "ses_enabled" {
 output "ses_domain_name" {
   description = "The SES domain name (null if no custom domain)"
   value       = module.ses_email.domain_name
+}
+
+# DynamoDB Outputs
+output "dynamodb_users_table_name" {
+  description = "The name of the DynamoDB users table"
+  value       = module.dynamodb.users_table_name
+}
+
+output "dynamodb_urls_table_name" {
+  description = "The name of the DynamoDB URLs table"
+  value       = module.dynamodb.urls_table_name
+}
+
+output "dynamodb_users_table_arn" {
+  description = "The ARN of the DynamoDB users table"
+  value       = module.dynamodb.users_table_arn
+}
+
+output "dynamodb_urls_table_arn" {
+  description = "The ARN of the DynamoDB URLs table"
+  value       = module.dynamodb.urls_table_arn
+}
+
+output "dynamodb_policy_arn" {
+  description = "The ARN of the IAM policy for DynamoDB access"
+  value       = module.dynamodb.dynamodb_policy_arn
 }

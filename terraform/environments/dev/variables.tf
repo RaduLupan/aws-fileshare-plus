@@ -101,3 +101,12 @@ variable "file_retention_days" {
   type        = number
   default     = 30
 }
+
+# -----------------------------------------------------------------------------
+# DynamoDB Configuration
+# -----------------------------------------------------------------------------
+variable "enable_point_in_time_recovery" {
+  description = "Enable point-in-time recovery for DynamoDB tables."
+  type        = bool
+  default     = true
+}
