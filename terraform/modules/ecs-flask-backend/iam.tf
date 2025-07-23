@@ -80,6 +80,23 @@ resource "aws_iam_policy" "flask_app_s3_access" {
           "cognito-idp:AdminRemoveUserFromGroup"
         ],
         Resource = "arn:aws:cognito-idp:us-east-2:481509955802:userpool/*"
+      },
+      {
+        Sid    = "AllowDynamoDBAccess",
+        Effect = "Allow",
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:BatchGetItem",
+          "dynamodb:BatchWriteItem"
+        ],
+        Resource = [
+          "arn:aws:dynamodb:${var.aws_region}:*:table/${var.project_name}-${var.environment}-*"
+        ]
       }
     ]
   })
@@ -96,8 +113,4 @@ resource "aws_iam_role_policy_attachment" "flask_app_s3_policy_attachment" {
   role       = aws_iam_role.flask_app_task.name
 }
 
-# Attach the DynamoDB access policy to the Flask application task role
-resource "aws_iam_role_policy_attachment" "flask_app_dynamodb_policy_attachment" {
-  policy_arn = var.dynamodb_policy_arn
-  role       = aws_iam_role.flask_app_task.name
-}
+# DynamoDB permissions are now included in the main flask_app_s3_access policy

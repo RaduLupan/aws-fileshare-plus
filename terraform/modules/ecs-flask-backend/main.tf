@@ -54,6 +54,26 @@ resource "aws_ecs_task_definition" "flask" {
       {
         name  = "FRONTEND_DOMAIN"
         value = var.frontend_domain # CloudFront domain for short URL construction
+      },
+      {
+        name  = "USE_DYNAMODB"
+        value = "true" # Enable DynamoDB for production
+      },
+      {
+        name  = "PROJECT_NAME"
+        value = var.project_name
+      },
+      {
+        name  = "ENVIRONMENT"
+        value = var.environment
+      },
+      {
+        name  = "DYNAMODB_USERS_TABLE"
+        value = "${var.project_name}-${var.environment}-users"
+      },
+      {
+        name  = "DYNAMODB_SHORT_URLS_TABLE"
+        value = "${var.project_name}-${var.environment}-urls"
       }
     ]
     logConfiguration = {
