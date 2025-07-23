@@ -894,14 +894,26 @@ def user_status_endpoint(decoded_token):
         # Get trial status from database
         try:
             from user_management import get_user_trial_status
+            print(f"[USER_STATUS] Calling get_user_trial_status for {user_email}")
             trial_status = get_user_trial_status(user_email, user_id)
-        except ImportError:
+            print(f"[USER_STATUS] Trial status result: {trial_status}")
+        except ImportError as import_err:
+            print(f"[USER_STATUS] ImportError: {import_err}")
             # Fallback if user_management can't be imported
             trial_status = {
                 'user_tier': 'Free',
                 'trial_status': 'not_started',
                 'days_remaining': 0,
                 'can_start_trial': True
+            }
+        except Exception as db_err:
+            print(f"[USER_STATUS] Database error: {db_err}")
+            # Fallback for any database errors
+            trial_status = {
+                'user_tier': 'Free',
+                'trial_status': 'error',
+                'days_remaining': 0,
+                'can_start_trial': False
             }
         
         # Determine user tier - prioritize database over JWT groups

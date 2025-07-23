@@ -33,6 +33,9 @@ class DynamoDBAdapter:
     def get_user_trial_status(self, user_email, user_id):
         """Get comprehensive trial status for a user"""
         try:
+            print(f"[DYNAMODB] Getting trial status for user_id: {user_id}, email: {user_email}")
+            print(f"[DYNAMODB] Using table: {self.users_table_name}")
+            
             # Try to get user by user_id first
             response = self.users_table.get_item(
                 Key={'user_id': user_id}
@@ -54,9 +57,12 @@ class DynamoDBAdapter:
                     # User doesn't exist, create them as a new free tier user
                     user = self._create_new_user(user_id, user_email)
             
-            return self._format_trial_status(user)
+            result = self._format_trial_status(user)
+            print(f"[DYNAMODB] Formatted trial status: {result}")
+            return result
             
         except Exception as e:
+            print(f"[DYNAMODB] Error getting trial status for user {user_email}: {e}")
             logger.error(f"Error getting trial status for user {user_email}: {e}")
             # Return default status for new user
             return {
