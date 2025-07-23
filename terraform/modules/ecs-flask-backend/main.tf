@@ -66,6 +66,14 @@ resource "aws_ecs_task_definition" "flask" {
       {
         name  = "ENVIRONMENT"
         value = var.environment
+      },
+      {
+        name  = "DYNAMODB_USERS_TABLE"
+        value = "${var.project_name}-${var.environment}-users"
+      },
+      {
+        name  = "DYNAMODB_SHORT_URLS_TABLE"
+        value = "${var.project_name}-${var.environment}-urls"
       }
     ]
     logConfiguration = {

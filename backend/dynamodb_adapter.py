@@ -18,11 +18,11 @@ class DynamoDBAdapter:
         self.dynamodb = boto3.resource('dynamodb', region_name=self.aws_region)
         
         # Get table names from environment
-        project_name = os.getenv('PROJECT_NAME', 'aws-fileshare-plus')
-        environment = os.getenv('ENVIRONMENT', 'prod')
+        project_name = os.getenv('PROJECT_NAME', 'file-sharing-app')
+        environment = os.getenv('ENVIRONMENT', 'dev')
         
         self.users_table_name = os.getenv('DYNAMODB_USERS_TABLE', f"{project_name}-{environment}-users")
-        self.short_urls_table_name = os.getenv('DYNAMODB_SHORT_URLS_TABLE', f"{project_name}-{environment}-short-urls")
+        self.short_urls_table_name = os.getenv('DYNAMODB_SHORT_URLS_TABLE', f"{project_name}-{environment}-urls")
         
         # Initialize table references
         self.users_table = self.dynamodb.Table(self.users_table_name)
